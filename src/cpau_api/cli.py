@@ -127,7 +127,7 @@ class CpauElectricCli(BaseApp):
 
                 # Determine fieldnames based on interval type
                 if self.args.interval == 'billing':
-                    fieldnames = ['date', 'billing_period', 'export_kwh', 'import_kwh', 'net_kwh']
+                    fieldnames = ['date', 'billing_period_start', 'billing_period_end', 'billing_period_length', 'export_kwh', 'import_kwh', 'net_kwh']
                 else:
                     fieldnames = ['date', 'export_kwh', 'import_kwh', 'net_kwh']
 
@@ -140,8 +140,10 @@ class CpauElectricCli(BaseApp):
                         'import_kwh': record.import_kwh,
                         'net_kwh': record.net_kwh,
                     }
-                    if self.args.interval == 'billing' and record.billing_period:
-                        row['billing_period'] = record.billing_period
+                    if self.args.interval == 'billing':
+                        row['billing_period_start'] = record.billing_period_start
+                        row['billing_period_end'] = record.billing_period_end
+                        row['billing_period_length'] = record.billing_period_length
                     rows.append(row)
 
                 # Write CSV output

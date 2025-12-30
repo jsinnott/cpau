@@ -471,8 +471,8 @@ class CpauElectricMeter(CpauMeter):
                 date=month_date,
                 import_kwh=month_data['import_kwh'],
                 export_kwh=month_data['export_kwh'],
-                net_kwh=net_kwh,
-                billing_period=None  # No billing period for calendar months
+                net_kwh=net_kwh
+                # No billing period fields for calendar months
             )
             usage_records.append(record)
 
@@ -516,14 +516,29 @@ class CpauElectricMeter(CpauMeter):
                         # If we can't parse the billing period, include it to be safe
                         pass
 
-                # Monthly data: group by Year-Month
+                # Billing data: group by Year-Month
                 key = f"{record['Year']}-{record['Month']:02d}"
                 if key not in grouped_data:
-                    # Use the start date of the billing period as the datetime
+                    # Parse the billing period to extract start, end, and length
+                    billing_start = None
+                    billing_end = None
+                    billing_length = None
+
                     if ' to ' in bill_period:
-                        period_start_str = bill_period.split(' to ')[0].strip()
+                        period_start_str, period_end_str = bill_period.split(' to ')
                         try:
-                            period_datetime = datetime.strptime(period_start_str, '%m/%d/%y')
+                            period_start_dt = datetime.strptime(period_start_str.strip(), '%m/%d/%y')
+                            period_end_dt = datetime.strptime(period_end_str.strip(), '%m/%d/%y')
+
+                            # Convert to YYYY-MM-DD format
+                            billing_start = period_start_dt.strftime('%Y-%m-%d')
+                            billing_end = period_end_dt.strftime('%Y-%m-%d')
+
+                            # Calculate length in days (inclusive)
+                            billing_length = (period_end_dt.date() - period_start_dt.date()).days + 1
+
+                            # Use the start date as the record datetime
+                            period_datetime = period_start_dt
                         except ValueError:
                             period_datetime = datetime(record['Year'], record['Month'], 1)
                     else:
@@ -531,7 +546,9 @@ class CpauElectricMeter(CpauMeter):
 
                     grouped_data[key] = {
                         'date': period_datetime,
-                        'billing_period': bill_period,
+                        'billing_period_start': billing_start,
+                        'billing_period_end': billing_end,
+                        'billing_period_length': billing_length,
                         'export_kwh': 0.0,
                         'import_kwh': 0.0,
                     }
@@ -591,7 +608,9 @@ class CpauElectricMeter(CpauMeter):
                 import_kwh=period_data['import_kwh'],
                 export_kwh=period_data['export_kwh'],
                 net_kwh=net_kwh,
-                billing_period=period_data.get('billing_period')
+                billing_period_start=period_data.get('billing_period_start'),
+                billing_period_end=period_data.get('billing_period_end'),
+                billing_period_length=period_data.get('billing_period_length')
             )
             usage_records.append(record)
 

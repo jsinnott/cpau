@@ -24,13 +24,17 @@ class UsageRecord:
         import_kwh: Energy imported from grid (consumption)
         export_kwh: Energy exported to grid (solar generation)
         net_kwh: Net energy (import - export)
-        billing_period: Optional billing period string (monthly data only)
+        billing_period_start: Optional start date of billing period (billing interval only)
+        billing_period_end: Optional end date of billing period (billing interval only)
+        billing_period_length: Optional length of billing period in days (billing interval only)
     """
     date: datetime
     import_kwh: float
     export_kwh: float
     net_kwh: float
-    billing_period: Optional[str] = None
+    billing_period_start: Optional[str] = None
+    billing_period_end: Optional[str] = None
+    billing_period_length: Optional[int] = None
 
 
 class CpauMeter(ABC):

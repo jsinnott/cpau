@@ -283,3 +283,19 @@ of (daily) data for December is not yet available.
 Currently this invocation terminates with an error because the fetching of daily data wants to use
 an end date that is greater than two days in the past. Can you verify I'm right about this and, if
 so, correct the problem?
+
+** Step 17: Functional enhancement (cosmetic)
+
+When using the "billing" interval, the output data currently contains a column called 
+"billing_period", a string of the form "mm/dd/yy to mm/dd/yy". Please remove this column from the
+output and substitute three new columns: billing_period_start, billing_period_end (both strings,
+yyyy-mm-dd) and billing_period_length (an int, number of days in the billing period).
+
+** Step 18: Edge case - remove "end date after two days ago" error, replace with a warning about omitted data
+
+I think we'd improve usability if we stop terminating with an error if the specified end date is
+after the end of available data. Instead I think the script should log a warning and output the data
+that is available.
+
+This also applies to the start date? So if someone requests data from 1970 to 2025, log a warning
+and output the data that is available. Make sense?
