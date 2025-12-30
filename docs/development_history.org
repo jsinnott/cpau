@@ -257,3 +257,15 @@ To rectify this, please make the following changes:
     "monthly" interval
   + Change the behavior of the "monthly" interval so that it is an aggregation of daily data-- add
     up the values returned in daily data for a given month.
+
+** Step 16a: Bug fix
+
+I think I've found a bug, try this:
+
+$ ./bin/cpau-electric -i monthly 2025-08-15 2025-10-15
+
+I'd expect this invocation to emit full month data for August, September and October but if you test
+it I think you'll discover that the aggregated data for August and October only include data for
+part of the month (August contains only 08-15 to 08-31 and October contains only 10-01 to 10-15).
+
+Can you confirm this problem and, assuming I'm right, fix it?

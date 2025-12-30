@@ -5,6 +5,7 @@ This module provides the CpauElectricMeter class for retrieving electric
 meter usage data from the CPAU portal.
 """
 
+import calendar
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -386,6 +387,11 @@ class CpauElectricMeter(CpauMeter):
         """
         Aggregate daily data into calendar months.
 
+        Expands the date range to include full calendar months. For example,
+        if start_date is 2025-08-15 and end_date is 2025-10-15, this will
+        fetch data from 2025-08-01 to 2025-10-31 to ensure complete month
+        aggregations.
+
         Args:
             start_date: Start date for aggregation
             end_date: End date for aggregation
@@ -393,9 +399,19 @@ class CpauElectricMeter(CpauMeter):
         Returns:
             List of UsageRecord objects, one per calendar month
         """
-        # Fetch daily data for the entire range
-        logger.debug(f"Fetching daily data to aggregate into months: {start_date} to {end_date}")
-        daily_records = self.get_usage('daily', start_date, end_date)
+        # Expand the date range to full calendar months
+        # Start from the first day of the start month
+        expanded_start = start_date.replace(day=1)
+
+        # End on the last day of the end month using calendar.monthrange
+        _, last_day = calendar.monthrange(end_date.year, end_date.month)
+        expanded_end = end_date.replace(day=last_day)
+
+        logger.debug(f"Expanding date range for monthly aggregation: {start_date} to {end_date} -> {expanded_start} to {expanded_end}")
+
+        # Fetch daily data for the expanded range
+        logger.debug(f"Fetching daily data to aggregate into months: {expanded_start} to {expanded_end}")
+        daily_records = self.get_usage('daily', expanded_start, expanded_end)
 
         # Group by calendar month
         monthly_data = {}
