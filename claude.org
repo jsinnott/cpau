@@ -1,0 +1,203 @@
+
+
+Hi Claude--
+
+Let's work together to write a new Python script.
+
+Big Picture:
+
+Broadly, we're going to construct an application to automate downloading of utility meter data
+(electric) from my local utility and write that data to stdout. The utility does not (to my
+knowledge) have a public API that enables easy downloading of data but their website does allow
+manual export of that data. My hope is that we can write a Python app that invokes the (non-public)
+apis used by the website but if that proves to be impossible/impractical we can instead do a more
+pure web scraping app (which to me means using Python to manipulate a browser instance).
+
+Some details:
+
++ My utility is "City of Palo Alto Utilities"
++ The URL that allow display of meter data is https://mycpau.cityofpaloalto.org/Portal/Usages.aspx
+
+Let's start by having you look at that page (please prompt me when you need userid/password data)
+and seeing if you can discern how to make web api request(s) to access the relevant data.
+
+* Context: The Story So Far
+
+The current directory contains a number of files, most of which were written by you in response to
+my previous request that you read "phase-1.org" and follow the instructions it contains.
+
+More specifically, you created and executed various experimental scripts (all Python I believe) to
+discern how to download the historical electric meter data displayed on the web site for my local
+utility ("CPAU", for "City of Palo Alto Utilities").
+
+The result of your (excellent) work, in addition to the scripts you used to figure out how to
+perform the download, your main work product:
+
+  + cpau_download.py - the script that performs the data download that I requested.
+
+Our focus today will be to add some enhancements to that script.
+  
+* Work for today:
+
+I'd like to do a few more things today.
+
+** Step 1: Document the behavior of the current script
+
+Please start by examining the file phase-1.org, an (org-mode) file containing my instructions for
+you for our prior work session. Note that you have completed the work described in phase-1.org so no
+further action is required on the work it describes.
+
+After that, please consider the following instruction:
+
+During our last work session you wrote an excellent README file that described the "what and why" of
+your work so far. Sadly, I've deleted that file. I realize that you've lost much of the context of
+our prior work session but for our first step today, please create a new README file containing as
+much of that prior context as possible. My guess is that it will be useful to examine the
+experimental scripts (that is, the scripts other than cpau_download.py) and discern their
+purposes. I'd also imagine that it might be helpful to notice the timestamps of those scripts (and
+other files) as this will give you information about the order in which you created them.
+
+** Step 2: Update cpau_download.py to use my standard app architecture
+
+I've added two new files to our working directory:
+
++ baseapp.py - actually a symlink to a file outside our working directory. Please don't edit this
+  file. This file contains the parent class that our application should sub-class. The parent class
+  is called BaseApp and it's an abstract base class. 
++ skeleton.py - This file contains the skeleton of a BaseApp subclass. When I write Python apps I
+  typically start with this skeleton and add features. The result of this is an app that can take
+  advantage of a bunch of infrastructure that I always use-- parsing args, logging, etc.
+
+Please modify cpau_download.py so that it is structured like the app in skeleton.py-- either by
+modifying the existing cpau_download.py to use that structure or by updating skeleton.py to contain
+the features of the existing cpau_download.py script.
+
+** Step 3: Update cpau_download.py to emit CSV data instead of JSON data
+
+The current version of cpau_download.py writes a JSON structure to stdout. Please update the script
+to instead write CSV data to stdout. The columns of the output CSV data should correspond to the
+keys in the hashes that are in the "usage_summary" array in the current JSON data.
+
+** Step 4: Add support for additional time intervals
+
+The current version of cpau_download.py emits dumps data from the default view of consumption data
+on the CPAU web site, which is "monthly data for the last year" (actually "billing period data for
+the last year" but it's roughly monthly). But the site also allows other granularities-- day, hour
+and quarter-hour (15 minutes). For these other granularities the site also allow specification of
+the start and end dates. 
+
+So: Please update cpau_download.py to support specification of date ranges (I think date is
+sufficient, no need to support date/time ranges) and granularities. I suspect you're going to
+need/want to use your existing experimental scripts (from our prior work session) or write new ones
+to look at the site and discern the request parameters that support date ranges and granularities.
+
+** Step 5: Change a couple of options to positional parameters
+
+The current version of cpau_download.py allows specification of the start and end dates as "options"
+(in the argparse sense of "option"): --from-date and --to-date. Please update the script so that the
+start and end dates are positional parameters, where the start date is required and the end date is
+optional and defaults to two days ago. Also: please change the expected date format from MM/DD/YY to
+YYYY-MM-DD (that's what I use in all my other scripts) and include checking code to make sure the
+dates are sensible-- things like the end is >= the start, end is no later than two days ago, etc.
+
+Also: Please update the README.md file so it's up-to-date on our current work/discoveries/etc.
+
+** Step 6: Bug fixes
+
+It looks to me like the current version of cpau_download.py has one or more bugs related to the
+start and end dates. Can you please check that the parameters are respected?
+
+Example:
+
+This invocation
+
+$ ./cpau_download.py --interval daily 2025-11-21 2025-11-23
+
+should return either two or three records (we've not specified if the end date is inclusive or
+exclusive) but I think it currently returns 30 records.
+
+Please look at this specific scenario and also ask this broader question: When start and end dates
+are specified, does the output data respect those dates?
+
+** Step 7: ISO dates and times
+
+We previously changed cpau_download.py to use "iso like" dates for input parameters. Next please
+make the dates (or datetimes) in the output CSV data ISO format. For clarity, "ISO format" in this
+context should be "timezone naive"-- so no timezone is necessary. Also, no need to reformat the
+dates in the "billing period" column that's part of monthly data.
+
+** Step 8: Restructure directories, prepare for water data
+
+Please take a look at the changes I've made to our directory structure-- the broad goal of these
+changes is to create a structure that is conducive to two things we'll work on in the future:
+
+  + Prepare for future work on another script that will be similar to cpau_download.py (which we'll
+    shortly rename) but that will download CPAU *water meter* data.
+  + Separate the files created as part of the development of cpau_download.py from the final
+    script. This is important because we'll eventually make this into an installable Python
+    package, where people who install the package will get the two executables-- one for electric
+    meter data and one for water meter data. I have a *lot* to learn before this can all happen but
+    the directory changes seem like an important starting point.
+
+Please review these changes and do the following:
+
+  + Make any script updates necessary-- my guess is that many of the scripts in dev-tools/electric
+    are dependent on secrets.json which is now located two directories above those scripts. Same
+    with the test scripts.
+  + Make any documentation changes necessary-- particularly to README.md.
+    
+** Step 9: A new dev-tools test script to discern earliest available meter data
+
+Please create a new script in dev-tools/electric that uses a binary search to discern the earliest
+date for which data (for each interval size) is available. Once the earliest date for each interval
+size is determined, the script should write a simple (human readable) message to stdout.
+
+** Step 9a: Augment the find_earliest_data.py script provide *latest* data availability as well
+
+Please update find_earliest_data.py to also output the *latest* date for which data is available. I
+know we've limited the end date parameter to cpau-electric.py (new name) to two days ago, but when
+searching for the latest available data please don't assume that-- the latest available data may
+actually be near-real-time.
+
+** Step 9b: Bug in find_earliest_data.py
+
+I've renamed find_earliest_data.py to find_availability_windows.py.
+
+And: that script currently is reporting "unknown" for the end dates of the data availability windows
+for hourly and 15-minute intervals. Can you either fix this or explain to me why it's valid?
+
+** Step 9c: Bug in find_availability_windows.py
+
+Can you take one more look at find_availability_windows.py? Specifically, it looks to me like it's
+not doing a binary search to determine the window for monthly data-- the payload for the search
+request doesn't seem to include any date information so (I think) the search is always the same. Can
+you fix this or explain to me why you think it's valid?
+
+** Step 10: Refactor cpau-electric.py to separate an API library from the CLI app
+
+OK, this next step is a big one. Please use the knowledge you've accumulated building and testing
+cpau-electric.py to create two new python files.
+
+The first file should be an Python module that exposes two user-facing classes:
+
+  + a CpauApiSession class that encapsulates the interaction with the web apis that you've
+    discovered and used in cpau-electric.py. This constructor for this class should take a userid
+    and password and it should expose attributes related to a CPAU account. It should also expose
+    methods to return instances of another class defined in the module representing an electric
+    meter.
+  + a CpauElectricMeter class that exposes methods to access meter data-- the data that is currently
+    emitted by cpau-electric.py. As you think about this class please consider that we will, in the
+    future, be adding a CpauWaterMeter class (not yet) so we'll likely decompose the electric meter
+    class into an abstract meter and a electric meter subclass.
+
+To start this process, please write a design document that contains descriptions of these two
+classes and the (python) method signatures of their public methods.
+
+** Step 11: Perform the refactor
+
+Thanks for an excellent API_DESIGN.md document. Please go ahead and implement the classes it
+describes.
+
+** Step 11a: Git Commit
+
+Please commit the changes you made in step 11 to the local repo.

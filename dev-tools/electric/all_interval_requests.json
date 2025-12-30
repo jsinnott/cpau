@@ -1,0 +1,82 @@
+[
+  {
+    "timestamp": "2025-12-22T17:54:04.082328",
+    "mode": "M",
+    "hourly_type": "H",
+    "payload": {
+      "UsageOrGeneration": "1",
+      "Type": "K",
+      "Mode": "M",
+      "strDate": "",
+      "hourlyType": "H",
+      "SeasonId": "",
+      "weatherOverlay": 0,
+      "usageyear": "",
+      "MeterNumber": "000000000001231463",
+      "DateFromDaily": "",
+      "DateToDaily": "",
+      "IsTier": true,
+      "IsTou": false
+    }
+  },
+  {
+    "timestamp": "2025-12-22T17:56:07.454914",
+    "mode": "MI",
+    "hourly_type": "H",
+    "payload": {
+      "UsageOrGeneration": "1",
+      "Type": "K",
+      "Mode": "MI",
+      "strDate": "",
+      "hourlyType": "H",
+      "SeasonId": 0,
+      "weatherOverlay": 0,
+      "usageyear": "",
+      "MeterNumber": "000000000001231463",
+      "DateFromDaily": "",
+      "DateToDaily": "",
+      "IsTier": true,
+      "IsTou": false
+    }
+  },
+  {
+    "timestamp": "2025-12-22T17:56:10.498449",
+    "mode": "H",
+    "hourly_type": "H",
+    "payload": {
+      "UsageOrGeneration": "1",
+      "Type": "K",
+      "Mode": "H",
+      "strDate": "",
+      "hourlyType": "H",
+      "SeasonId": 0,
+      "weatherOverlay": 0,
+      "usageyear": "",
+      "MeterNumber": "000000000001231463",
+      "DateFromDaily": "",
+      "DateToDaily": "",
+      "IsTier": true,
+      "IsTou": false
+    }
+  },
+  {
+    "timestamp": "2025-12-22T17:56:13.534886",
+    "mode": "D",
+    "hourly_type": "H",
+    "payload": {
+      "UsageOrGeneration": "1",
+      "Type": "K",
+      "Mode": "D",
+      "strDate": "",
+      "hourlyType": "H",
+      "SeasonId": 0,
+      "weatherOverlay": 0,
+      "usageyear": "",
+      "MeterNumber": "000000000001231463",
+      "DateFromDaily": "",
+      "DateToDaily": "",
+      "IsTier": true,
+      "IsTou": false
+    }
+  }
+]

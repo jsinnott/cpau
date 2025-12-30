@@ -1,0 +1,22 @@
+{
+  "M": [
+    {
+      "timestamp": "2025-12-22T17:52:37.189611",
+      "payload": {
+        "UsageOrGeneration": "1",
+        "Type": "K",
+        "Mode": "M",
+        "strDate": "",
+        "hourlyType": "H",
+        "SeasonId": "",
+        "weatherOverlay": 0,
+        "usageyear": "",
+        "MeterNumber": "000000000001231463",
+        "DateFromDaily": "",
+        "DateToDaily": "",
+        "IsTier": true,
+        "IsTou": false
+      }
+    }
+  ]
+}

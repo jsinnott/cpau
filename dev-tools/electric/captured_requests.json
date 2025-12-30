@@ -1,0 +1,36 @@
+[
+  {
+    "url": "https://mycpau.cityofpaloalto.org/Portal/Usages.aspx/BindMultiMeter",
+    "method": "POST",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "csrftoken": "pyBDKC8Ry9HyxVtUr1MYBub6hwCcfrBfWQYUevHnC4wiYr3aUZY/1vWXdZC6R3Zz",
+      "referer": "https://mycpau.cityofpaloalto.org/Portal/Usages.aspx",
+      "sec-ch-ua": "\"HeadlessChrome\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "x-requested-with": "XMLHttpRequest",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36",
+      "accept": "application/json, text/javascript, */*; q=0.01",
+      "content-type": "application/json; charset=UTF-8",
+      "isajax": "1"
+    },
+    "post_data": "{\"MeterType\":\"E\"}"
+  },
+  {
+    "url": "https://mycpau.cityofpaloalto.org/Portal/Usages.aspx/LoadUsage",
+    "method": "POST",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "csrftoken": "pyBDKC8Ry9HyxVtUr1MYBub6hwCcfrBfWQYUevHnC4wiYr3aUZY/1vWXdZC6R3Zz",
+      "referer": "https://mycpau.cityofpaloalto.org/Portal/Usages.aspx",
+      "sec-ch-ua": "\"HeadlessChrome\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "x-requested-with": "XMLHttpRequest",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/143.0.7499.4 Safari/537.36",
+      "accept": "application/json, text/javascript, */*; q=0.01",
+      "content-type": "application/json; charset=UTF-8",
+      "isajax": "1"
+    },
+    "post_data": "{\"UsageOrGeneration\":\"1\",\"Type\":\"K\",\"Mode\":\"M\",\"strDate\":\"\",\"hourlyType\":\"H\",\"SeasonId\":\"\",\"weatherOverlay\":0,\"usageyear\":\"\",\"MeterNumber\":\"000000000001231463\",\"DateFromDaily\":\"\",\"DateToDaily\":\"\",\"IsTier\":true,\"IsTou\":false}"
+  }
+]
