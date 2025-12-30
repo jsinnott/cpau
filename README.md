@@ -1,27 +1,41 @@
-# CPAU Meter Data Scraper
+# CPAU API
 
-A Python script to automatically download electric meter data from the City of Palo Alto Utilities (CPAU) customer portal.
+A Python library and CLI tool to download electric meter data from the City of Palo Alto Utilities (CPAU) customer portal.
 
 ## Project Goal
 
-Automate the download of historical electricity usage data from the CPAU customer portal at https://mycpau.cityofpaloalto.org/Portal/Usages.aspx. The utility does not provide a public API, so this tool reverse-engineers the web portal's internal API calls to retrieve data programmatically.
+Provide programmatic access to historical electricity usage data from the CPAU customer portal at https://mycpau.cityofpaloalto.org/Portal/Usages.aspx. The utility does not provide a public API, so this library reverse-engineers the web portal's internal API calls to retrieve data programmatically.
+
+## Features
+
+- **Python Library**: Clean, pythonic API for accessing CPAU data in your applications
+- **CLI Tool**: Command-line interface for downloading data to CSV
+- **Multiple Intervals**: Support for monthly, daily, hourly, and 15-minute data
+- **Type Hints**: Full type annotations for better IDE support
+- **No Browser Automation**: Direct HTTP API calls for better performance
 
 ## Quick Start
 
 ### Installation
 
-1. Create and activate a virtual environment:
+#### For Users (from PyPI - when published)
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+pip install cpau-api
 ```
 
-2. Install dependencies:
+#### For Development
 ```bash
-pip install -r requirements.txt
+# Clone the repository
+git clone https://github.com/yourusername/cpau-api.git
+cd cpau-api
+
+# Install in editable mode
+pip install -e .
 ```
 
-3. Create a `secrets.json` file with your CPAU login credentials:
+### Credentials Setup
+
+Create a `secrets.json` file with your CPAU login credentials:
 ```json
 {
     "userid": "your_email@example.com",
@@ -29,22 +43,46 @@ pip install -r requirements.txt
 }
 ```
 
-### Usage
+**Important**: Never commit this file to version control. It's already in `.gitignore`.
 
-The script requires a start date and optionally accepts an end date (defaults to 2 days ago):
+### CLI Usage
+
+After installation, the `cpau-electric` command will be available:
 
 ```bash
 # Get daily data for a specific date range
-python3 cpau_download.py 2025-12-15 2025-12-20 --interval daily > usage.csv
+cpau-electric --interval daily 2025-12-15 2025-12-20 > usage.csv
 
 # Get hourly data for a single day (end date defaults to 2 days ago if omitted)
-python3 cpau_download.py 2025-12-17 --interval hourly > hourly.csv
+cpau-electric --interval hourly 2025-12-17 > hourly.csv
 
 # Get 15-minute interval data for multiple days
-python3 cpau_download.py 2025-12-17 2025-12-18 --interval 15min > detailed.csv
+cpau-electric --interval 15min 2025-12-17 2025-12-18 > detailed.csv
 
-# Get monthly billing data (requires date arguments to filter billing periods)
-python3 cpau_download.py 2025-01-01 --interval monthly > monthly.csv
+# Get monthly billing data
+cpau-electric --interval monthly 2025-01-01 > monthly.csv
+```
+
+### Library Usage
+
+```python
+from cpau_api import CpauApiSession
+from datetime import date
+
+# Create a session and login
+with CpauApiSession(userid='your_email', password='your_password') as session:
+    # Get the electric meter
+    meter = session.get_electric_meter()
+
+    # Get daily usage data
+    data = meter.get_daily_usage(
+        start_date=date(2025, 12, 1),
+        end_date=date(2025, 12, 31)
+    )
+
+    # Process the data
+    for record in data:
+        print(f"{record.date}: {record.net_kwh} kWh")
 ```
 
 **Date Format**: All input dates must be in `YYYY-MM-DD` format (e.g., `2025-12-17`)
@@ -376,9 +414,35 @@ For date ranges longer than 30 days, the script makes multiple API calls and fil
 
 ## Dependencies
 
-- **Python 3.7+**
+- **Python 3.8+**
 - **requests** - For HTTP API calls
-- **playwright** (optional) - Only needed for experimental/debugging scripts
+
+## Repository Structure
+
+```
+cpau-api/
+├── src/cpau_api/          # Main library package
+│   ├── __init__.py        # Public API exports
+│   ├── session.py         # CpauApiSession class
+│   ├── meter.py           # Base meter classes
+│   ├── electric_meter.py  # Electric meter implementation
+│   ├── exceptions.py      # Custom exceptions
+│   └── cli.py             # Command-line interface
+│
+├── docs/                  # Documentation
+│   ├── api_design.md      # API design document
+│   └── development_history.org  # Development notes
+│
+├── dev-tools/             # Development and exploration scripts
+│   └── electric/          # Scripts used to reverse-engineer the API
+│
+├── tests/                 # Test suite
+│   └── manual/            # Manual integration tests
+│
+├── pyproject.toml         # Package configuration
+├── README.md              # This file
+└── secrets.json           # Your credentials (gitignored, create manually)
+```
 
 ## License
 

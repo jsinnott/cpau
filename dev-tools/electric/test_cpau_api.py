@@ -10,8 +10,8 @@ import json
 import sys
 from datetime import date, timedelta
 
-# Add parent directory to path to import cpau_api
-sys.path.insert(0, '/Users/jsinnott/code/cpau-scrape')
+# Add src directory to path to import cpau_api
+sys.path.insert(0, '/Users/jsinnott/code/cpau-scrape/src')
 
 from cpau_api import CpauApiSession
 

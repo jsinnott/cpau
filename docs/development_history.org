@@ -201,3 +201,14 @@ describes.
 ** Step 11a: Git Commit
 
 Please commit the changes you made in step 11 to the local repo.
+
+** Step 12: Let's think about the directory structure
+
+My goal with this project is to eventually push a git repo to github.com and create a python package
+installable using pip or uv that provides the user with the api library and a CLI script that's
+conceptually equivalent to cpau-electric.py (also, eventually, "cpau-water.py" but not yet).
+
+Given this, please give me your thoughts on how the files and directories of our project are
+currently arranged. Should we move things around to create a structure more consistent with the
+goals stated above?
+
