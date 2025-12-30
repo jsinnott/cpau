@@ -387,10 +387,12 @@ class CpauElectricMeter(CpauMeter):
         """
         Aggregate daily data into calendar months.
 
-        Expands the date range to include full calendar months. For example,
-        if start_date is 2025-08-15 and end_date is 2025-10-15, this will
-        fetch data from 2025-08-01 to 2025-10-31 to ensure complete month
-        aggregations.
+        Expands the date range to include full calendar months, but only includes
+        months where complete daily data is available (within the 2-day-ago limit).
+
+        For example, if start_date is 2025-08-15 and end_date is 2025-10-15, this
+        will fetch data from 2025-08-01 to 2025-10-31. However, if the last day of
+        a month exceeds the data availability limit, that month is excluded.
 
         Args:
             start_date: Start date for aggregation
@@ -399,6 +401,9 @@ class CpauElectricMeter(CpauMeter):
         Returns:
             List of UsageRecord objects, one per calendar month
         """
+        # Calculate the "2 days ago" limit for data availability
+        two_days_ago = date.today() - timedelta(days=2)
+
         # Expand the date range to full calendar months
         # Start from the first day of the start month
         expanded_start = start_date.replace(day=1)
@@ -406,6 +411,26 @@ class CpauElectricMeter(CpauMeter):
         # End on the last day of the end month using calendar.monthrange
         _, last_day = calendar.monthrange(end_date.year, end_date.month)
         expanded_end = end_date.replace(day=last_day)
+
+        # Check if the expanded end is beyond the data availability limit
+        # If so, move back to the last complete month that's fully available
+        if expanded_end > two_days_ago:
+            logger.debug(f"Expanded end date {expanded_end} exceeds data availability limit {two_days_ago}")
+            # Find the last day of the previous month
+            first_of_current_month = expanded_end.replace(day=1)
+            expanded_end = first_of_current_month - timedelta(days=1)
+
+            # Keep moving back until we find a month that's fully available
+            while expanded_end > two_days_ago:
+                first_of_current_month = expanded_end.replace(day=1)
+                expanded_end = first_of_current_month - timedelta(days=1)
+
+            logger.debug(f"Adjusted to last complete month ending: {expanded_end}")
+
+        # If adjusted end is before adjusted start, no complete months available
+        if expanded_end < expanded_start:
+            logger.warning(f"No complete months available in range {start_date} to {end_date}")
+            return []
 
         logger.debug(f"Expanding date range for monthly aggregation: {start_date} to {end_date} -> {expanded_start} to {expanded_end}")
 

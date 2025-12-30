@@ -269,3 +269,17 @@ it I think you'll discover that the aggregated data for August and October only 
 part of the month (August contains only 08-15 to 08-31 and October contains only 10-01 to 10-15).
 
 Can you confirm this problem and, assuming I'm right, fix it?
+
+** Step 16b: Bug fix
+
+I think I've found a bug, try this:
+
+$ ./bin/cpau-electric -i monthly 2025-10-15
+
+I believe the right behavior here (we could debate this if you have a different view) is to return
+monthly (i.e. aggregated daily) data for October and November *but not December* since the full set
+of (daily) data for December is not yet available.
+
+Currently this invocation terminates with an error because the fetching of daily data wants to use
+an end date that is greater than two days in the past. Can you verify I'm right about this and, if
+so, correct the problem?
