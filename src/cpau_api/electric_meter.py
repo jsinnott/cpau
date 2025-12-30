@@ -98,10 +98,19 @@ class CpauElectricMeter(CpauMeter):
             logger.error(f"Invalid date range: end_date ({end_date}) < start_date ({start_date})")
             raise ValueError(f"end_date ({end_date}) must be >= start_date ({start_date})")
 
+        # Adjust date range if it exceeds data availability limits
+        # Data is typically not available for the last 2 days
         two_days_ago = date.today() - timedelta(days=2)
+        original_end_date = end_date
+
         if end_date > two_days_ago:
-            logger.error(f"end_date ({end_date}) is too recent (must be <= {two_days_ago})")
-            raise ValueError(f"end_date ({end_date}) cannot be later than 2 days ago ({two_days_ago})")
+            logger.warning(f"Requested end_date ({end_date}) is beyond data availability limit ({two_days_ago}). Adjusting to {two_days_ago}.")
+            end_date = two_days_ago
+
+        # Check if adjusted range is still valid
+        if end_date < start_date:
+            logger.warning(f"After adjusting for data availability, no data is available in the requested range ({start_date} to {original_end_date})")
+            return []
 
         # Get mode code
         mode = self._INTERVAL_MODE_MAP[interval]
