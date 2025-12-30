@@ -212,3 +212,10 @@ Given this, please give me your thoughts on how the files and directories of our
 currently arranged. Should we move things around to create a structure more consistent with the
 goals stated above?
 
+** Step 13: Re-introduce inheritance from BaseApp into cpau-electric
+
+I notice that in the restructuring of cpau-electric.py you dropped the inheritance from BaseApp. I
+think this was unwise-- BaseApp provides a logger and CLI options to control log level.
+
+Please update cpau-electric so that it restores this function (OK to replace the symlink-- that
+can't be a link when we push to github, right?)

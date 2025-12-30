@@ -25,6 +25,8 @@ classifiers = [
 ]
 dependencies = [
     "requests>=2.31.0",
+    "coloredlogs>=15.0",
+    "humanfriendly>=10.0",
 ]
 
 [project.optional-dependencies]
