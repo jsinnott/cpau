@@ -20,16 +20,19 @@ class CpauElectricMeter(CpauMeter):
     """
     Represents a CPAU electric meter and provides methods to retrieve usage data.
 
-    Supports four interval types:
-    - monthly: Billing period data (roughly monthly)
+    Supports five interval types:
+    - billing: Billing period data (CPAU's billing periods, roughly monthly)
+    - monthly: Calendar month aggregation (sum of daily data by month)
     - daily: Daily aggregated usage
     - hourly: Hourly usage data
     - 15min: 15-minute interval usage data
     """
 
     # Map interval names to API mode codes
+    # Note: 'monthly' is special - it aggregates daily data, not a direct API mode
     _INTERVAL_MODE_MAP = {
-        'monthly': 'M',
+        'billing': 'M',
+        'monthly': None,  # Aggregated from daily data
         'daily': 'D',
         'hourly': 'H',
         '15min': 'MI'
@@ -40,7 +43,7 @@ class CpauElectricMeter(CpauMeter):
         Get list of supported interval types for electric meters.
 
         Returns:
-            ['monthly', 'daily', 'hourly', '15min']
+            ['billing', 'monthly', 'daily', 'hourly', '15min']
         """
         return list(self._INTERVAL_MODE_MAP.keys())
 
@@ -59,7 +62,7 @@ class CpauElectricMeter(CpauMeter):
         Retrieve usage data for the specified interval and date range.
 
         Args:
-            interval: One of 'monthly', 'daily', 'hourly', '15min'
+            interval: One of 'billing', 'monthly', 'daily', 'hourly', '15min'
             start_date: Start date (inclusive)
             end_date: End date (inclusive). If None, defaults to 2 days ago.
 
@@ -71,8 +74,9 @@ class CpauElectricMeter(CpauMeter):
             CpauApiError: If API request fails
 
         Notes:
-            - For monthly interval, billing periods that overlap the date range are included
-            - For other intervals, only data within the exact date range is returned
+            - billing: Returns CPAU billing periods that overlap with the date range
+            - monthly: Returns calendar month aggregations of daily data
+            - Other intervals return data within the exact date range
             - Date range is limited to data available from CPAU (typically not within last 2 days)
         """
         # Validate interval
@@ -100,11 +104,17 @@ class CpauElectricMeter(CpauMeter):
 
         # Get mode code
         mode = self._INTERVAL_MODE_MAP[interval]
+
+        # Special handling for monthly (calendar month aggregation)
+        if interval == 'monthly':
+            logger.debug("Aggregating daily data into calendar months")
+            return self._aggregate_monthly(start_date, end_date)
+
         logger.debug(f"Using API mode: {mode}")
 
         # Fetch data based on interval type
         if mode == 'M':
-            logger.debug("Fetching monthly billing data")
+            logger.debug("Fetching billing period data")
             raw_records = self._fetch_monthly_data()
         elif mode == 'D':
             logger.debug("Fetching daily data")
@@ -121,18 +131,34 @@ class CpauElectricMeter(CpauMeter):
         logger.info(f"Retrieved {len(usage_records)} {interval} usage records")
         return usage_records
 
+    def get_billing_usage(
+        self,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve billing period data.
+
+        Convenience method equivalent to get_usage(interval='billing', ...)
+
+        Returns:
+            List of UsageRecord objects with billing_period attribute populated
+        """
+        return self.get_usage('billing', start_date, end_date)
+
     def get_monthly_usage(
         self,
         start_date: date,
         end_date: Optional[date] = None
     ) -> list[UsageRecord]:
         """
-        Retrieve monthly billing period data.
+        Retrieve calendar month aggregated usage data.
 
         Convenience method equivalent to get_usage(interval='monthly', ...)
+        Aggregates daily data into calendar months.
 
         Returns:
-            List of UsageRecord objects with billing_period attribute populated
+            List of UsageRecord objects, one per calendar month
         """
         return self.get_usage('monthly', start_date, end_date)
 
@@ -187,7 +213,7 @@ class CpauElectricMeter(CpauMeter):
         Iterate over usage data in chunks to avoid loading large datasets into memory.
 
         Args:
-            interval: One of 'monthly', 'daily', 'hourly', '15min'
+            interval: One of 'billing', 'monthly', 'daily', 'hourly', '15min'
             start_date: Start date (inclusive)
             end_date: End date (inclusive). If None, defaults to 2 days ago.
             chunk_days: Number of days to fetch per API request (default 30)
@@ -197,13 +223,13 @@ class CpauElectricMeter(CpauMeter):
 
         Notes:
             - Useful for processing large date ranges without loading all data into memory
-            - Not applicable to monthly interval (always returns all billing periods)
+            - Billing and monthly intervals don't benefit from chunking (billing returns all periods, monthly aggregates daily data)
         """
         if end_date is None:
             end_date = date.today() - timedelta(days=2)
 
-        if interval == 'monthly':
-            # Monthly data returns everything at once, so just yield from get_usage
+        if interval in ['billing', 'monthly']:
+            # Billing/monthly data: just yield from get_usage (no chunking benefit)
             for record in self.get_usage(interval, start_date, end_date):
                 yield record
             return
@@ -302,11 +328,15 @@ class CpauElectricMeter(CpauMeter):
                 records = data.get('objUsageGenerationResultSetTwo', [])
 
                 # Add records, avoiding duplicates
+                # Note: Each date has multiple records (one per usage type: import/export)
                 for record in records:
-                    date_key = record.get('UsageDate')
-                    if date_key and date_key not in seen_dates:
+                    usage_date = record.get('UsageDate')
+                    usage_type = record.get('UsageType')
+                    # Dedup key includes both date and type
+                    record_key = f"{usage_date}_{usage_type}"
+                    if usage_date and record_key not in seen_dates:
                         all_records.append(record)
-                        seen_dates.add(date_key)
+                        seen_dates.add(record_key)
 
                 # Move back 30 days for next iteration
                 current_end = current_end - timedelta(days=30)
@@ -352,6 +382,62 @@ class CpauElectricMeter(CpauMeter):
 
         return all_records
 
+    def _aggregate_monthly(self, start_date: date, end_date: date) -> list[UsageRecord]:
+        """
+        Aggregate daily data into calendar months.
+
+        Args:
+            start_date: Start date for aggregation
+            end_date: End date for aggregation
+
+        Returns:
+            List of UsageRecord objects, one per calendar month
+        """
+        # Fetch daily data for the entire range
+        logger.debug(f"Fetching daily data to aggregate into months: {start_date} to {end_date}")
+        daily_records = self.get_usage('daily', start_date, end_date)
+
+        # Group by calendar month
+        monthly_data = {}
+        for record in daily_records:
+            # Extract year-month key
+            record_date = record.date
+            if isinstance(record_date, datetime):
+                month_key = record_date.strftime('%Y-%m')
+            else:
+                month_key = record_date.strftime('%Y-%m')
+
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {
+                    'import_kwh': 0.0,
+                    'export_kwh': 0.0,
+                }
+
+            monthly_data[month_key]['import_kwh'] += record.import_kwh
+            monthly_data[month_key]['export_kwh'] += record.export_kwh
+
+        # Convert to UsageRecord objects
+        usage_records = []
+        for month_key in sorted(monthly_data.keys()):
+            month_data = monthly_data[month_key]
+            # Create datetime for first day of the month
+            year, month = month_key.split('-')
+            month_date = datetime(int(year), int(month), 1)
+
+            net_kwh = month_data['import_kwh'] - month_data['export_kwh']
+
+            record = UsageRecord(
+                date=month_date,
+                import_kwh=month_data['import_kwh'],
+                export_kwh=month_data['export_kwh'],
+                net_kwh=net_kwh,
+                billing_period=None  # No billing period for calendar months
+            )
+            usage_records.append(record)
+
+        logger.info(f"Aggregated daily data into {len(usage_records)} calendar months")
+        return usage_records
+
     def _parse_records(
         self,
         raw_records: list[dict],
@@ -365,11 +451,11 @@ class CpauElectricMeter(CpauMeter):
         Handles grouping of import/export records and filtering by date range.
         """
         grouped_data = {}
-        is_monthly = (interval == 'monthly')
+        is_billing = (interval == 'billing')
 
         for record in raw_records:
-            if is_monthly:
-                # Monthly data: filter to billing periods that overlap with requested date range
+            if is_billing:
+                # Billing data: filter to billing periods that overlap with requested date range
                 bill_period = record.get('BillPeriod', '')
 
                 # Parse billing period dates (format: "MM/DD/YY to MM/DD/YY")

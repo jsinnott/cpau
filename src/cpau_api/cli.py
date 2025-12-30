@@ -29,9 +29,9 @@ class CpauElectricCli(BaseApp):
             '-i',
             '--interval',
             type=str,
-            choices=['monthly', 'daily', 'hourly', '15min'],
-            default='monthly',
-            help='Time interval for data retrieval (default: monthly)'
+            choices=['billing', 'monthly', 'daily', 'hourly', '15min'],
+            default='billing',
+            help='Time interval for data retrieval (default: billing)'
         )
 
         parser.add_argument(
@@ -126,7 +126,7 @@ class CpauElectricCli(BaseApp):
                 self.logger.info(f"Retrieved {len(usage_records)} records")
 
                 # Determine fieldnames based on interval type
-                if self.args.interval == 'monthly':
+                if self.args.interval == 'billing':
                     fieldnames = ['date', 'billing_period', 'export_kwh', 'import_kwh', 'net_kwh']
                 else:
                     fieldnames = ['date', 'export_kwh', 'import_kwh', 'net_kwh']
@@ -140,7 +140,7 @@ class CpauElectricCli(BaseApp):
                         'import_kwh': record.import_kwh,
                         'net_kwh': record.net_kwh,
                     }
-                    if self.args.interval == 'monthly' and record.billing_period:
+                    if self.args.interval == 'billing' and record.billing_period:
                         row['billing_period'] = record.billing_period
                     rows.append(row)
 

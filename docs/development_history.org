@@ -241,3 +241,19 @@ Two more clean up tasks (really questions):
     be moved to the docs directory?
   + The same root (cpau-scrape) still contains our original cpau-electric (.py, .bash,
     symlink). These are now obsolete, right?
+
+** Step 16: Back to feature/function
+
+I continue to be troubled by the fact that the "monthly" interval behaves differently that the other
+interval types:
+
+  + Monthly only provides data for the last (roughly) year
+  + Monthly data *isn't really monthly*-- it instead corresponds to "data for the billing period
+    that roughly corresponds to the month"
+
+To rectify this, please make the following changes:
+
+  + Add a new interval type, something like "billing period", that behaves like the current
+    "monthly" interval
+  + Change the behavior of the "monthly" interval so that it is an aggregation of daily data-- add
+    up the values returned in daily data for a given month.
