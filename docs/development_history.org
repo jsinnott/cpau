@@ -219,3 +219,15 @@ think this was unwise-- BaseApp provides a logger and CLI options to control log
 
 Please update cpau-electric so that it restores this function (OK to replace the symlink-- that
 can't be a link when we push to github, right?)
+
+** Step 14: Extend use of logger to the api classes
+
+You've certainly discerned that BaseApp provides access to a logger class that's configured to use
+coloredlogs and to format output lines to my preferences.
+
+Let's discuss how to best augment the API classes to that they include logging-- where to me
+"include logging" means "log consistently (or using) the BaseApp-provided logger". But of course we
+want *other* clients of the api classes to have access to log output as well-- so maybe the api
+session constructor takes an optional logger?
+
+What would you recommend (no implementation yet please).

@@ -6,11 +6,14 @@ meter usage data from the CPAU portal.
 """
 
 import json
+import logging
 from datetime import date, datetime, timedelta
 from typing import Optional, Iterator
 
 from .meter import CpauMeter, UsageRecord
 from .exceptions import CpauApiError
+
+logger = logging.getLogger(__name__)
 
 
 class CpauElectricMeter(CpauMeter):
@@ -74,6 +77,7 @@ class CpauElectricMeter(CpauMeter):
         """
         # Validate interval
         if interval not in self._INTERVAL_MODE_MAP:
+            logger.error(f"Invalid interval: {interval}")
             raise ValueError(
                 f"Invalid interval '{interval}'. Must be one of: {', '.join(self.get_available_intervals())}"
             )
@@ -82,28 +86,39 @@ class CpauElectricMeter(CpauMeter):
         if end_date is None:
             end_date = date.today() - timedelta(days=2)
 
+        logger.info(f"Fetching {interval} usage data from {start_date} to {end_date}")
+
         # Validate date range
         if end_date < start_date:
+            logger.error(f"Invalid date range: end_date ({end_date}) < start_date ({start_date})")
             raise ValueError(f"end_date ({end_date}) must be >= start_date ({start_date})")
 
         two_days_ago = date.today() - timedelta(days=2)
         if end_date > two_days_ago:
+            logger.error(f"end_date ({end_date}) is too recent (must be <= {two_days_ago})")
             raise ValueError(f"end_date ({end_date}) cannot be later than 2 days ago ({two_days_ago})")
 
         # Get mode code
         mode = self._INTERVAL_MODE_MAP[interval]
+        logger.debug(f"Using API mode: {mode}")
 
         # Fetch data based on interval type
         if mode == 'M':
+            logger.debug("Fetching monthly billing data")
             raw_records = self._fetch_monthly_data()
         elif mode == 'D':
+            logger.debug("Fetching daily data")
             raw_records = self._fetch_daily_data(start_date, end_date)
         else:  # Hourly or 15min
+            logger.debug(f"Fetching {interval} data")
             raw_records = self._fetch_hourly_or_15min_data(mode, start_date, end_date)
+
+        logger.debug(f"Retrieved {len(raw_records)} raw records from API")
 
         # Parse and filter records
         usage_records = self._parse_records(raw_records, interval, start_date, end_date)
 
+        logger.info(f"Retrieved {len(usage_records)} {interval} usage records")
         return usage_records
 
     def get_monthly_usage(
@@ -236,6 +251,7 @@ class CpauElectricMeter(CpauMeter):
         all_records = []
 
         if days_in_range <= 30:
+            logger.debug(f"Fetching daily data with single API call ({days_in_range} days)")
             # Single API call
             payload = {
                 'UsageOrGeneration': '1',
@@ -257,10 +273,15 @@ class CpauElectricMeter(CpauMeter):
             all_records = data.get('objUsageGenerationResultSetTwo', [])
         else:
             # Multiple API calls needed - fetch in 30-day chunks from end date backwards
+            num_calls = (days_in_range + 29) // 30  # Ceiling division
+            logger.debug(f"Fetching daily data with multiple API calls ({num_calls} calls for {days_in_range} days)")
             current_end = end_date
             seen_dates = set()  # Track dates to avoid duplicates
+            call_count = 0
 
             while current_end >= start_date:
+                call_count += 1
+                logger.debug(f"Daily data API call {call_count}/{num_calls} for date {current_end}")
                 payload = {
                     'UsageOrGeneration': '1',
                     'Type': 'K',
@@ -298,10 +319,15 @@ class CpauElectricMeter(CpauMeter):
 
         The API only supports single day per request, so we make one request per day.
         """
+        days_in_range = (end_date - start_date).days + 1
+        logger.debug(f"Fetching hourly/15min data: {days_in_range} API calls (one per day)")
         all_records = []
         current_date = start_date
+        call_count = 0
 
         while current_date <= end_date:
+            call_count += 1
+            logger.debug(f"Hourly/15min data API call {call_count}/{days_in_range} for date {current_date}")
             payload = {
                 'UsageOrGeneration': '1',
                 'Type': 'K',

@@ -6,6 +6,7 @@ and session management for the CPAU portal.
 """
 
 import json
+import logging
 import re
 import requests
 from typing import Optional
@@ -17,6 +18,8 @@ from .exceptions import (
     CpauApiError,
     CpauMeterNotFoundError
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CpauApiSession:
@@ -39,6 +42,7 @@ class CpauApiSession:
             CpauAuthenticationError: If login fails
             CpauConnectionError: If unable to connect to CPAU portal
         """
+        logger.debug(f"Initializing CPAU API session for user: {userid}")
         self._userid = userid
         self._password = password
         self._session = requests.Session()
@@ -49,6 +53,7 @@ class CpauApiSession:
         self._authenticated = False
 
         # Login automatically on initialization
+        logger.debug("Attempting automatic login")
         self.login()
 
     def login(self) -> bool:
@@ -67,9 +72,12 @@ class CpauApiSession:
         """
         try:
             # First, get the homepage to establish session cookies and extract CSRF token
+            logger.info("Authenticating with CPAU portal")
+            logger.debug("Fetching homepage to establish session")
             homepage_response = self._session.get('https://mycpau.cityofpaloalto.org/Portal')
 
             if homepage_response.status_code != 200:
+                logger.error(f"Failed to connect to CPAU portal (status {homepage_response.status_code})")
                 raise CpauConnectionError(f"Failed to connect to CPAU portal (status {homepage_response.status_code})")
 
             # Extract CSRF token from the page
@@ -77,6 +85,7 @@ class CpauApiSession:
             csrf_match = re.search(r'name="__RequestVerificationToken".*?value="([^"]+)"', homepage_response.text)
             if csrf_match:
                 csrf_token = csrf_match.group(1)
+                logger.debug("Extracted CSRF token from homepage")
 
             # Prepare login payload
             payload = {
@@ -101,6 +110,7 @@ class CpauApiSession:
                 headers['csrftoken'] = csrf_token
 
             # Submit login request
+            logger.debug("Submitting login credentials")
             login_url = 'https://mycpau.cityofpaloalto.org/Portal/Default.aspx/validateLogin'
             response = self._session.post(login_url, json=payload, headers=headers)
 
@@ -114,14 +124,18 @@ class CpauApiSession:
                         if isinstance(result, dict):
                             if result.get('STATUS') == '1' or 'UserID' in result:
                                 self._authenticated = True
+                                logger.info("Successfully authenticated")
                                 return True
                         elif isinstance(result, list) and len(result) > 0:
                             if result[0].get('STATUS') == '1' or 'UserID' in result[0]:
                                 self._authenticated = True
+                                logger.info("Successfully authenticated")
                                 return True
                 except Exception as e:
+                    logger.error(f"Login response error: {e}")
                     raise CpauAuthenticationError(f"Login response error: {e}")
 
+            logger.error("Authentication failed: Invalid credentials")
             raise CpauAuthenticationError("Invalid credentials")
 
         except requests.RequestException as e:
@@ -138,13 +152,16 @@ class CpauApiSession:
             CpauApiError: If API request fails
         """
         if not self._authenticated:
+            logger.error("Cannot retrieve meters: Not authenticated")
             raise CpauAuthenticationError("Not authenticated. Call login() first.")
 
         try:
             # Navigate to Usages page to get CSRF token
+            logger.debug("Retrieving CSRF token from Usages page")
             self._csrf_token = self._get_csrf_token('Usages')
 
             # Get meter info
+            logger.debug("Fetching electric meter information")
             headers = {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -157,6 +174,7 @@ class CpauApiSession:
             meter_response = self._session.post(meter_url, json={'MeterType': 'E'}, headers=headers)
 
             if meter_response.status_code != 200:
+                logger.error(f"Failed to fetch meter information (status {meter_response.status_code})")
                 raise CpauApiError(f"Failed to fetch meter information (status {meter_response.status_code})")
 
             meter_data = meter_response.json()
@@ -169,6 +187,7 @@ class CpauApiSession:
                     if meter['Status'] == 1:  # Active meter
                         active_meters.append(CpauElectricMeter(self, meter))
 
+            logger.info(f"Found {len(active_meters)} active electric meter(s)")
             return active_meters
 
         except requests.RequestException as e:
@@ -192,15 +211,20 @@ class CpauApiSession:
         meters = self.get_electric_meters()
 
         if not meters:
+            logger.error("No active electric meters found")
             raise CpauMeterNotFoundError("No active electric meters found")
 
         if meter_number is None:
+            logger.debug(f"Returning default meter: {meters[0].meter_number}")
             return meters[0]
 
+        logger.debug(f"Looking for meter: {meter_number}")
         for meter in meters:
             if meter.meter_number == meter_number:
+                logger.debug(f"Found meter: {meter_number}")
                 return meter
 
+        logger.error(f"Meter {meter_number} not found")
         raise CpauMeterNotFoundError(f"Meter {meter_number} not found")
 
     @property
@@ -226,6 +250,7 @@ class CpauApiSession:
         session as a context manager.
         """
         if self._session:
+            logger.debug("Closing CPAU API session")
             self._session.close()
             self._authenticated = False
 
@@ -284,13 +309,16 @@ class CpauApiSession:
             CpauApiError: If request fails
         """
         if not self._authenticated:
+            logger.error("Cannot make API request: Not authenticated")
             raise CpauAuthenticationError("Not authenticated")
 
         # Ensure we have a CSRF token
         if not self._csrf_token:
+            logger.debug("CSRF token not cached, retrieving")
             self._csrf_token = self._get_csrf_token('Usages')
 
         try:
+            logger.debug(f"Making API request to endpoint: {endpoint}")
             headers = {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -303,11 +331,13 @@ class CpauApiSession:
             response = self._session.post(url, json=payload, headers=headers)
 
             if response.status_code != 200:
+                logger.error(f"API request to {endpoint} failed (status {response.status_code})")
                 raise CpauApiError(f"API request failed (status {response.status_code})")
 
             response_data = response.json()
             parsed_data = json.loads(response_data['d'])
 
+            logger.debug(f"API request to {endpoint} successful")
             return parsed_data
 
         except requests.RequestException as e:
