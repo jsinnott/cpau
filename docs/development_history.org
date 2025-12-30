@@ -231,3 +231,13 @@ want *other* clients of the api classes to have access to log output as well-- s
 session constructor takes an optional logger?
 
 What would you recommend (no implementation yet please).
+
+** Step 15: A bit more clean-up
+
+Two more clean up tasks (really questions):
+
+  + The "root" (cpau-scrape) directory still contains README.md, a (I believe) very useful document
+    that describes the process we went through to figure out how the CPAU web apis work. Should this
+    be moved to the docs directory?
+  + The same root (cpau-scrape) still contains our original cpau-electric (.py, .bash,
+    symlink). These are now obsolete, right?
