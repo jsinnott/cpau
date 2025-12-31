@@ -33,9 +33,14 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-mock>=3.12.0",
     "black",
     "mypy",
     "types-requests",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-mock>=3.12.0",
 ]
 docs = [
     "sphinx>=7.0",

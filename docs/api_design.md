@@ -2,24 +2,24 @@
 
 ## Overview
 
-This document describes the design of a Python library that abstracts the CPAU (City of Palo Alto Utilities) web API interactions discovered during the development of `cpau-electric.py`. The library will separate API concerns from CLI concerns, making the CPAU API accessible to other applications.
+This document describes the design of a Python library that abstracts the CPAU (City of Palo Alto Utilities) web API interactions for both electric and water meter data. The library separates API concerns from CLI concerns, making CPAU data accessible to other applications programmatically.
 
 ## Design Goals
 
 1. **Separation of Concerns**: Decouple API logic from CLI application logic
 2. **Reusability**: Enable other applications to access CPAU data programmatically
-3. **Extensibility**: Design for future addition of water meter support
+3. **Multi-Meter Support**: Provide unified interface for both electric and water meter data
 4. **Clean Abstractions**: Hide implementation details while exposing intuitive interfaces
 5. **Type Safety**: Use type hints throughout for better IDE support and runtime checking
 
 ## Architecture
 
-The library will consist of three main classes:
+The library consists of four main classes:
 
 ```
 CpauApiSession
-    └── manages authentication, session state, CSRF tokens
-    └── provides factory methods for meter objects
+    └── manages authentication, session state, CSRF tokens (for electric meter)
+    └── provides factory methods for electric meter objects
 
 CpauMeter (abstract base class)
     └── defines common meter interface
@@ -27,7 +27,13 @@ CpauMeter (abstract base class)
 
 CpauElectricMeter (concrete implementation)
     └── implements electric meter-specific data retrieval
-    └── supports multiple interval types (monthly, daily, hourly, 15-minute)
+    └── supports multiple interval types (billing, monthly, daily, hourly, 15-minute)
+
+CpauWaterMeter (concrete implementation)
+    └── implements water meter-specific data retrieval
+    └── handles SAML/SSO authentication via Playwright
+    └── supports multiple interval types (billing, monthly, daily, hourly)
+    └── implements cookie caching for fast re-authentication
 ```
 
 ---
@@ -411,6 +417,199 @@ class CpauElectricMeter(CpauMeter):
 
 ---
 
+## Class: CpauWaterMeter
+
+### Purpose
+Concrete implementation for water meters. Provides methods to retrieve water usage data at various intervals (billing, monthly, daily, hourly) for specified date ranges. Unlike electric meters, water meters use the WaterSmart portal which requires SAML/SSO authentication.
+
+### Responsibilities
+- Authenticate via SAML/SSO using Playwright browser automation
+- Cache authentication cookies for fast re-authentication (~1s vs ~15s)
+- Validate date ranges for water meter queries
+- Translate interval types to WaterSmart API parameters
+- Parse and normalize WaterSmart API response data
+- Return data in consistent format compatible with electric meter interface
+
+### Public Interface
+
+```python
+from datetime import date
+from typing import Optional
+
+class CpauWaterMeter(CpauMeter):
+    """
+    Represents a CPAU water meter accessed via the WaterSmart portal.
+
+    Water meters require SAML/SSO authentication through the CPAU portal,
+    which redirects to WaterSmart. This class handles the authentication
+    automatically using Playwright and caches session cookies for fast
+    re-authentication.
+
+    Supports four interval types:
+    - billing: Billing period data
+    - monthly: Monthly aggregated usage
+    - daily: Daily usage data
+    - hourly: Hourly usage data
+    """
+
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        cache_dir: str = "~/.cpau",
+        timeout: int = 30000
+    ):
+        """
+        Initialize a water meter instance with automatic authentication.
+
+        Args:
+            username: CPAU account username/email
+            password: CPAU account password
+            cache_dir: Directory for caching authentication cookies (default: ~/.cpau)
+            timeout: Playwright timeout in milliseconds (default: 30000)
+
+        Raises:
+            CpauAuthenticationError: If SAML/SSO authentication fails
+            CpauConnectionError: If unable to connect to portals
+
+        Notes:
+            - First authentication takes ~15 seconds (Playwright/SAML flow)
+            - Subsequent authentications use cached cookies (~1 second)
+            - Cookies are valid for ~10 minutes
+        """
+        pass
+
+    def get_available_intervals(self) -> list[str]:
+        """
+        Get list of supported interval types for water meters.
+
+        Returns:
+            ['billing', 'monthly', 'daily', 'hourly']
+        """
+        pass
+
+    def get_usage(
+        self,
+        interval: str,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve water usage data for the specified interval and date range.
+
+        Args:
+            interval: One of 'billing', 'monthly', 'daily', 'hourly'
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive). If None, defaults to today.
+
+        Returns:
+            List of UsageRecord objects sorted by date
+            Note: Water usage is returned in the import_kwh field (gallons, not kWh)
+
+        Raises:
+            ValueError: If interval is invalid or date range is invalid
+            CpauApiError: If API request fails
+
+        Notes:
+            - Billing data typically available back to 2017
+            - Hourly data available for last ~3 months
+            - Water usage returned in gallons via the import_kwh field
+            - export_kwh and net_kwh fields are zero for water data
+        """
+        pass
+
+    def get_billing_usage(
+        self,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve billing period water usage data.
+
+        Convenience method equivalent to get_usage(interval='billing', ...)
+        """
+        pass
+
+    def get_monthly_usage(
+        self,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve monthly aggregated water usage.
+
+        Convenience method equivalent to get_usage(interval='monthly', ...)
+        """
+        pass
+
+    def get_daily_usage(
+        self,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve daily water usage data.
+
+        Convenience method equivalent to get_usage(interval='daily', ...)
+        """
+        pass
+
+    def get_hourly_usage(
+        self,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> list[UsageRecord]:
+        """
+        Retrieve hourly water usage data.
+
+        Convenience method equivalent to get_usage(interval='hourly', ...)
+
+        Note: Hourly data typically only available for last 3 months.
+        """
+        pass
+
+    def get_availability_window(self, interval: str) -> tuple[date, date]:
+        """
+        Get the date range for which data is available for a given interval.
+
+        Args:
+            interval: One of 'billing', 'monthly', 'daily', 'hourly'
+
+        Returns:
+            Tuple of (earliest_date, latest_date) for available data
+
+        Notes:
+            - Billing/monthly/daily: typically back to 2017
+            - Hourly: typically last 3 months
+        """
+        pass
+```
+
+### Implementation Notes
+
+**Authentication Flow:**
+1. Check cookie cache for valid session
+2. If cached cookies exist and are fresh (< 10 minutes), use them
+3. Otherwise, launch Playwright browser in headless mode
+4. Navigate to CPAU portal and authenticate
+5. Follow SAML redirect to WaterSmart portal
+6. Extract session cookies and cache them
+7. Use cookies for API requests
+
+**API Characteristics:**
+- WaterSmart uses REST API with JSON responses
+- Different endpoint structure than electric meter
+- Returns water consumption in gallons
+- Data availability varies by interval type
+- No 15-minute interval support
+
+**Data Mapping:**
+- Water consumption (gallons) → UsageRecord.import_kwh field
+- export_kwh and net_kwh always zero for water data
+- This allows unified interface with electric meters
+
+---
+
 ## Exception Hierarchy
 
 ```python
@@ -515,6 +714,82 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
         print(f"  Records: {len(data)}")
 ```
 
+### Water Meter - Basic Usage
+
+```python
+from cpau import CpauWaterMeter
+from datetime import date
+
+# Create water meter (handles SAML/SSO authentication automatically)
+meter = CpauWaterMeter(
+    username='myuser@example.com',
+    password='mypass',
+    cache_dir='~/.cpau'  # Optional: cache cookies for fast re-auth
+)
+
+# Get daily water usage for December 2024
+daily_data = meter.get_daily_usage(
+    start_date=date(2024, 12, 1),
+    end_date=date(2024, 12, 31)
+)
+
+# Water usage is in the import_kwh field (gallons, not kWh)
+for record in daily_data:
+    print(f"{record.date}: {record.import_kwh} gallons")
+```
+
+### Water Meter - Hourly Data
+
+```python
+from cpau import CpauWaterMeter
+from datetime import date
+
+meter = CpauWaterMeter(username='myuser', password='mypass')
+
+# Get hourly water usage (typically available for last 3 months)
+hourly_data = meter.get_hourly_usage(
+    start_date=date(2024, 12, 1),
+    end_date=date(2024, 12, 7)
+)
+
+for record in hourly_data:
+    print(f"{record.date}: {record.import_kwh} gallons")
+```
+
+### Water Meter - Billing Periods
+
+```python
+from cpau import CpauWaterMeter
+from datetime import date
+
+meter = CpauWaterMeter(username='myuser', password='mypass')
+
+# Get billing period data (available back to ~2017)
+billing_data = meter.get_billing_usage(
+    start_date=date(2024, 1, 1),
+    end_date=date(2024, 12, 31)
+)
+
+for record in billing_data:
+    print(f"{record.date}: {record.import_kwh} gallons")
+```
+
+### Water Meter - Check Data Availability
+
+```python
+from cpau import CpauWaterMeter
+
+meter = CpauWaterMeter(username='myuser', password='mypass')
+
+# Check what data is available for hourly interval
+earliest, latest = meter.get_availability_window('hourly')
+print(f"Hourly water data available from {earliest} to {latest}")
+
+# Check billing data availability
+earliest, latest = meter.get_availability_window('billing')
+print(f"Billing data available from {earliest} to {latest}")
+```
+
 ---
 
 ## Implementation Notes
@@ -549,50 +824,44 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
 
 ## File Organization
 
-Proposed module structure:
+Current module structure:
 
 ```
 cpau/
-    __init__.py          # Exports CpauApiSession, CpauElectricMeter, exceptions
-    session.py           # CpauApiSession implementation
-    meter.py             # CpauMeter base class
-    electric_meter.py    # CpauElectricMeter implementation
-    exceptions.py        # Exception classes
-    _api_client.py       # Internal API interaction helpers
+    __init__.py                # Exports CpauApiSession, CpauElectricMeter,
+                               # CpauWaterMeter, exceptions
+    session.py                 # CpauApiSession implementation (electric meter)
+    meter.py                   # CpauMeter base class
+    electric_meter.py          # CpauElectricMeter implementation
+    water_meter.py             # CpauWaterMeter implementation
+    watersmart_session.py      # SAML/SSO authentication for WaterSmart
+    exceptions.py              # Exception classes
+    cli.py                     # CLI implementations (cpau-electric, cpau-water)
+    baseapp.py                 # CLI application framework
 ```
 
 ---
 
 ## Future Extensions
 
-### Water Meter Support
+### Potential Enhancements
 
-```python
-class CpauWaterMeter(CpauMeter):
-    """Future: Support for water meter data retrieval."""
+**Gas Meter Support**: If CPAU adds gas service in the future, the `CpauMeter` base class architecture supports adding a `CpauGasMeter` class.
 
-    def get_usage(self, interval: str, start_date: date, end_date: Optional[date] = None):
-        """TBD: Water meter API behavior may differ from electric."""
-        pass
-```
+**Unified Session for Water**: Currently `CpauWaterMeter` is standalone. A future enhancement could integrate it with `CpauApiSession` to provide a unified entry point for all meter types.
 
-### Factory Method Addition
+**Enhanced Caching**: The water meter cookie cache could be extended to support longer-lived refresh tokens if the WaterSmart API provides them.
 
-```python
-class CpauApiSession:
-    def get_water_meter(self, meter_number: Optional[str] = None) -> 'CpauWaterMeter':
-        """Future: Get water meter object."""
-        pass
-```
+**Async Support**: Add async/await versions of data retrieval methods for better performance in async applications.
 
 ---
 
-## Migration Path for cpau-electric.py
+## CLI Implementation
 
-The CLI script will be refactored to become a thin wrapper around the library:
+Both CLI tools (`cpau-electric` and `cpau-water`) are thin wrappers around the library:
 
+**Electric Meter CLI:**
 ```python
-#!/usr/bin/env python3
 from cpau import CpauApiSession
 from baseapp import BaseApp
 import csv
@@ -619,8 +888,35 @@ class CpauElectricCli(BaseApp):
                 })
 ```
 
+**Water Meter CLI:**
+```python
+from cpau import CpauWaterMeter
+from baseapp import BaseApp
+import csv
+import sys
+
+class CpauWaterCli(BaseApp):
+    def go(self, argv):
+        # Parse arguments
+        # ...
+
+        # Use library
+        meter = CpauWaterMeter(username, password, cache_dir)
+        data = meter.get_usage(interval, start_date, end_date)
+
+        # Write CSV output
+        writer = csv.DictWriter(sys.stdout, fieldnames=['date', 'gallons'])
+        writer.writeheader()
+        for record in data:
+            writer.writerow({
+                'date': record.date,
+                'gallons': record.import_kwh  # Water data in import_kwh field
+            })
+```
+
 This separation enables:
 - Using the API from other Python scripts
 - Testing the API independently from the CLI
 - Building alternative interfaces (web app, GUI, etc.)
 - Easier maintenance and evolution of both components
+- Unified interface for both electric and water data
