@@ -6,8 +6,9 @@ This directory contains automated tests for the CPAU library and CLI tools.
 
 ```
 tests/
-├── test_cli_electric.py    # Tests for cpau-electric CLI (✅ 11 tests passing)
+├── test_cli_electric.py     # Tests for cpau-electric CLI (✅ 11 tests passing)
 ├── test_cli_water.py        # Tests for cpau-water CLI (✅ 14 tests passing)
+├── test_cli_availability.py # Tests for cpau-availability CLI (✅ 11 tests passing)
 ├── test_electric_meter.py   # Tests for electric meter API
 ├── test_water_meter.py      # Tests for water meter API
 ├── fixtures/                # Mock API response data
@@ -120,9 +121,10 @@ Mock API responses are defined in `tests/fixtures/`:
 ## Test Results
 
 Current status:
-- ✅ CLI Tests: **25/25 passing**
+- ✅ CLI Tests: **36/36 passing**
   - cpau-electric CLI: 11/11 passing
   - cpau-water CLI: 14/14 passing
+  - cpau-availability CLI: 11/11 passing
 - ⚠️ API Tests: Some tests need mock improvements
   - Integration with actual API calls works (see manual tests)
   - Unit test mocking needs refinement

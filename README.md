@@ -17,11 +17,12 @@ Since CPAU doesn't provide a public API, this library reverse-engineers the web 
 ## Features
 
 - ✅ **Python Library**: Clean, pythonic API for accessing CPAU data in your applications
-- ✅ **CLI Tools**: Command-line interfaces for electric (`cpau-electric`) and water (`cpau-water`) data
+- ✅ **CLI Tools**: Command-line interfaces for electric (`cpau-electric`), water (`cpau-water`), and availability (`cpau-availability`) data
 - ✅ **Multiple Intervals**: Billing periods, monthly, daily, hourly, and 15-minute data
 - ✅ **CSV Output**: Standard CSV format for easy data analysis
 - ✅ **Type Hints**: Full type annotations for better IDE support
 - ✅ **Cookie Caching**: Fast authentication (~1s) for repeated water meter queries
+- ✅ **Data Availability Checks**: Discover what data ranges are available for your meters
 
 ## Installation
 
@@ -138,8 +139,39 @@ cpau-water --interval billing 2024-01-01 2024-12-31 > water_billing.csv
 cpau-water --cache-dir /tmp/cpau-cache --interval daily 2024-12-01 > water.csv
 ```
 
+### Data Availability
+
+```bash
+# Check what data is available for your meters
+cpau-availability > availability.csv
+
+# With verbose logging to see progress
+cpau-availability -v > availability.csv
+
+# Save to file
+cpau-availability --output-file availability.csv
+```
+
+The output shows available date ranges for each meter type and interval:
+
+```csv
+data_type,interval,data_start,data_end
+electric,billing,2020-01-01,2024-12-31
+electric,monthly,2020-01-01,2024-12-31
+electric,daily,2020-01-01,2024-12-31
+electric,hourly,2024-10-01,2024-12-31
+electric,15min,2024-10-01,2024-12-31
+water,billing,2017-01-01,2024-12-31
+water,monthly,2017-01-01,2024-12-31
+water,daily,2017-01-01,2024-12-31
+water,hourly,2024-10-01,2024-12-31
+```
+
+**Note**: This command checks both electric and water meters. If one meter fails (e.g., authentication issues), it will still report data for the other meter. The command only fails if both meters fail or no data is available.
+
 ### Command Options
 
+**cpau-electric and cpau-water:**
 - **start_date** (required): Start date in YYYY-MM-DD format
 - **end_date** (optional): End date in YYYY-MM-DD format
   - Electric meter: defaults to 2 days ago
@@ -150,6 +182,13 @@ cpau-water --cache-dir /tmp/cpau-cache --interval daily 2024-12-01 > water.csv
 - `--secrets-file`: Path to credentials file (default: `secrets.json`)
 - `--output-file, -o`: Write to file instead of stdout
 - `--cache-dir`: Cookie cache directory for water meter (default: `~/.cpau`)
+- `--verbose, -v`: Enable verbose debug logging
+- `--silent, -s`: Suppress all log output
+
+**cpau-availability:**
+- `--secrets-file`: Path to credentials file (default: `secrets.json`)
+- `--cache-dir`: Cookie cache directory for water meter (default: `~/.cpau`)
+- `--output-file, -o`: Write to file instead of stdout
 - `--verbose, -v`: Enable verbose debug logging
 - `--silent, -s`: Suppress all log output
 

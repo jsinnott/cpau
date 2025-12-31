@@ -355,5 +355,169 @@ def main_water():
     return app.go(sys.argv[1:])
 
 
+class CpauAvailabilityCli(BaseApp):
+    """Command-line application for checking CPAU data availability."""
+
+    def add_arg_definitions(self, parser: ArgumentParser) -> None:
+        """Add argument definitions to the parser."""
+        # Add BaseApp's standard arguments (--verbose, --silent)
+        super().add_arg_definitions(parser)
+
+        parser.add_argument(
+            '--secrets-file',
+            type=str,
+            default='secrets.json',
+            help='Path to JSON file containing CPAU login credentials (default: secrets.json)'
+        )
+
+        parser.add_argument(
+            '--cache-dir',
+            type=str,
+            default='~/.cpau',
+            help='Directory for caching water meter authentication cookies (default: ~/.cpau)'
+        )
+
+        parser.add_argument(
+            '-o',
+            '--output-file',
+            type=str,
+            default=None,
+            help='Path to output file (default: stdout)'
+        )
+
+    def go(self, argv: list) -> int:
+        """Main execution method."""
+        # Parse arguments and set up logger (BaseApp infrastructure)
+        super().go(argv)
+
+        # Load credentials
+        try:
+            secrets_path = Path(self.args.secrets_file)
+            if not secrets_path.exists():
+                self.logger.error(f"Secrets file not found: {self.args.secrets_file}")
+                self.logger.error("Please create a JSON file with 'userid' and 'password' fields.")
+                return 1
+
+            with open(secrets_path, 'r') as f:
+                creds = json.load(f)
+
+            if 'userid' not in creds or 'password' not in creds:
+                self.logger.error("Secrets file must contain 'userid' and 'password' fields")
+                return 1
+
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Invalid JSON in secrets file: {e}")
+            return 1
+        except Exception as e:
+            self.logger.error(f"Failed to read secrets file: {e}")
+            return 1
+
+        # Collect availability data
+        availability_records = []
+
+        # Check electric meter availability
+        try:
+            self.logger.info("Checking electric meter data availability")
+            with CpauApiSession(userid=creds['userid'], password=creds['password']) as session:
+                meter = session.get_electric_meter()
+                self.logger.debug(f"Found electric meter: {meter.meter_number}")
+
+                for interval in meter.get_available_intervals():
+                    self.logger.info(f"Checking electric {interval} data availability")
+                    try:
+                        earliest, latest = meter.get_availability_window(interval)
+                        if earliest and latest:
+                            availability_records.append({
+                                'data_type': 'electric',
+                                'interval': interval,
+                                'data_start': earliest.isoformat(),
+                                'data_end': latest.isoformat()
+                            })
+                            self.logger.debug(f"Electric {interval}: {earliest} to {latest}")
+                        else:
+                            self.logger.warning(f"No electric {interval} data available")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to check electric {interval} availability: {e}")
+
+        except CpauError as e:
+            self.logger.error(f"Electric meter error: {e}")
+            # Continue to check water meter
+        except Exception as e:
+            self.logger.error(f"Unexpected error checking electric meter: {e}")
+            if self.args.verbose:
+                import traceback
+                traceback.print_exc()
+            # Continue to check water meter
+
+        # Check water meter availability
+        try:
+            self.logger.info("Checking water meter data availability")
+            water_meter = CpauWaterMeter(
+                username=creds['userid'],
+                password=creds['password'],
+                cache_dir=self.args.cache_dir
+            )
+
+            for interval in water_meter.get_available_intervals():
+                self.logger.info(f"Checking water {interval} data availability")
+                try:
+                    earliest, latest = water_meter.get_availability_window(interval)
+                    if earliest and latest:
+                        availability_records.append({
+                            'data_type': 'water',
+                            'interval': interval,
+                            'data_start': earliest.isoformat(),
+                            'data_end': latest.isoformat()
+                        })
+                        self.logger.debug(f"Water {interval}: {earliest} to {latest}")
+                    else:
+                        self.logger.warning(f"No water {interval} data available")
+                except Exception as e:
+                    self.logger.warning(f"Failed to check water {interval} availability: {e}")
+
+        except Exception as e:
+            self.logger.error(f"Water meter error: {e}")
+            if self.args.verbose:
+                import traceback
+                traceback.print_exc()
+            # If both failed and we have no records, return error
+            if not availability_records:
+                return 1
+
+        # Output results
+        if not availability_records:
+            self.logger.error("No availability data found for any meter type")
+            return 1
+
+        self.logger.info(f"Found availability data for {len(availability_records)} interval(s)")
+
+        fieldnames = ['data_type', 'interval', 'data_start', 'data_end']
+
+        try:
+            if self.args.output_file:
+                with open(self.args.output_file, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(availability_records)
+                self.logger.info(f"Wrote {len(availability_records)} records to {self.args.output_file}")
+            else:
+                # Write to stdout
+                writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(availability_records)
+
+            return 0
+
+        except Exception as e:
+            self.logger.error(f"Failed to write output: {e}")
+            return 1
+
+
+def main_availability():
+    """Entry point for cpau-availability command."""
+    app = CpauAvailabilityCli()
+    return app.go(sys.argv[1:])
+
+
 if __name__ == '__main__':
     sys.exit(main_electric())

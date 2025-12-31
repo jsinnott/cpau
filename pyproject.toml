@@ -51,6 +51,7 @@ docs = [
 [project.scripts]
 cpau-electric = "cpau.cli:main_electric"
 cpau-water = "cpau.cli:main_water"
+cpau-availability = "cpau.cli:main_availability"
 
 [project.urls]
 Homepage = "https://github.com/jsinnott/cpau"
