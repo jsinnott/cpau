@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Documentation Status](https://readthedocs.org/projects/cpau/badge/?version=latest)](https://cpau.readthedocs.io/en/latest/?badge=latest)
 
 A Python library and CLI tools for downloading electric and water meter data from the City of Palo Alto Utilities (CPAU) customer portal.
 
