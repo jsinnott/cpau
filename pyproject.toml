@@ -27,6 +27,7 @@ dependencies = [
     "requests>=2.31.0",
     "coloredlogs>=15.0",
     "humanfriendly>=10.0",
+    "playwright>=1.40.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ dev = [
 
 [project.scripts]
 cpau-electric = "cpau.cli:main_electric"
+cpau-water = "cpau.cli:main_water"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/cpau"

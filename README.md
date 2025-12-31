@@ -1,18 +1,22 @@
 # CPAU API
 
-A Python library and CLI tool to download electric meter data from the City of Palo Alto Utilities (CPAU) customer portal.
+A Python library and CLI tools to download electric and water meter data from the City of Palo Alto Utilities (CPAU) customer portal.
 
 ## Project Goal
 
-Provide programmatic access to historical electricity usage data from the CPAU customer portal at https://mycpau.cityofpaloalto.org/Portal/Usages.aspx. The utility does not provide a public API, so this library reverse-engineers the web portal's internal API calls to retrieve data programmatically.
+Provide programmatic access to historical electricity and water usage data from CPAU:
+- **Electric meter data**: From the CPAU customer portal at https://mycpau.cityofpaloalto.org/Portal/Usages.aspx
+- **Water meter data**: From the WaterSmart portal at https://paloalto.watersmart.com
+
+The utility does not provide a public API, so this library reverse-engineers the web portals' internal API calls to retrieve data programmatically.
 
 ## Features
 
 - **Python Library**: Clean, pythonic API for accessing CPAU data in your applications
-- **CLI Tool**: Command-line interface for downloading data to CSV
-- **Multiple Intervals**: Support for monthly, daily, hourly, and 15-minute data
+- **CLI Tools**: Separate command-line interfaces for electric (`cpau-electric`) and water (`cpau-water`) data
+- **Multiple Intervals**: Support for billing periods, monthly, daily, and hourly data
 - **Type Hints**: Full type annotations for better IDE support
-- **No Browser Automation**: Direct HTTP API calls for better performance
+- **Flexible Authentication**: Direct HTTP API calls for electric meter, SAML/SSO authentication for water meter
 
 ## Quick Start
 
@@ -20,7 +24,11 @@ Provide programmatic access to historical electricity usage data from the CPAU c
 
 #### For Users (from PyPI - when published)
 ```bash
+# Install the package
 pip install cpau
+
+# For water meter support, install Playwright browser
+playwright install chromium
 ```
 
 #### For Development
@@ -31,7 +39,12 @@ cd cpau
 
 # Install in editable mode
 pip install -e .
+
+# For water meter support, install Playwright browser
+playwright install chromium
 ```
+
+**Note**: Water meter data requires Playwright for SAML/SSO authentication. The `playwright install chromium` command downloads a headless Chromium browser (~100MB). This is only needed if you plan to use water meter features.
 
 ### Credentials Setup
 
@@ -47,23 +60,47 @@ Create a `secrets.json` file with your CPAU login credentials:
 
 ### CLI Usage
 
+#### Electric Meter Data
+
 After installation, the `cpau-electric` command will be available:
 
 ```bash
 # Get daily data for a specific date range
-cpau-electric --interval daily 2025-12-15 2025-12-20 > usage.csv
+cpau-electric --interval daily 2024-12-15 2024-12-20 > usage.csv
 
 # Get hourly data for a single day (end date defaults to 2 days ago if omitted)
-cpau-electric --interval hourly 2025-12-17 > hourly.csv
+cpau-electric --interval hourly 2024-12-17 > hourly.csv
 
 # Get 15-minute interval data for multiple days
-cpau-electric --interval 15min 2025-12-17 2025-12-18 > detailed.csv
+cpau-electric --interval 15min 2024-12-17 2024-12-18 > detailed.csv
 
-# Get monthly billing data
-cpau-electric --interval monthly 2025-01-01 > monthly.csv
+# Get billing period data
+cpau-electric --interval billing 2024-01-01 > billing.csv
 ```
 
+#### Water Meter Data
+
+The `cpau-water` command provides similar functionality for water usage:
+
+```bash
+# Get daily water usage for a specific date range
+cpau-water --interval daily 2024-12-01 2024-12-10 > water_usage.csv
+
+# Get hourly water data for a single day (end date defaults to today if omitted)
+cpau-water --interval hourly 2024-12-01 > water_hourly.csv
+
+# Get monthly aggregated water usage
+cpau-water --interval monthly 2024-09-01 2024-11-30 > water_monthly.csv
+
+# Get billing period water data
+cpau-water --interval billing 2024-01-01 2024-12-31 > water_billing.csv
+```
+
+**Note**: Water meter data requires Playwright for authentication (see Installation section below).Output for water meter uses "gallons" instead of kWh fields.
+
 ### Library Usage
+
+#### Electric Meter
 
 ```python
 from cpau import CpauApiSession
@@ -76,8 +113,8 @@ with CpauApiSession(userid='your_email', password='your_password') as session:
 
     # Get daily usage data
     data = meter.get_daily_usage(
-        start_date=date(2025, 12, 1),
-        end_date=date(2025, 12, 31)
+        start_date=date(2024, 12, 1),
+        end_date=date(2024, 12, 31)
     )
 
     # Process the data
@@ -85,9 +122,35 @@ with CpauApiSession(userid='your_email', password='your_password') as session:
         print(f"{record.date}: {record.net_kwh} kWh")
 ```
 
-**Date Format**: All input dates must be in `YYYY-MM-DD` format (e.g., `2025-12-17`)
+#### Water Meter
 
-**Important**: Due to data availability delays in the CPAU system, the end date cannot be later than 2 days ago. Hourly and 15-minute data typically has a 2-day lag before becoming available.
+```python
+from cpau import CpauWaterMeter
+from datetime import date
+
+# Create water meter (uses SAML/SSO authentication)
+meter = CpauWaterMeter(username='your_email', password='your_password')
+
+# Get daily water usage
+data = meter.get_daily_usage(
+    start_date=date(2024, 12, 1),
+    end_date=date(2024, 12, 31)
+)
+
+# Process the data (import_kwh contains gallons for water)
+for record in data:
+    print(f"{record.date}: {record.import_kwh} gallons")
+
+# Check data availability
+earliest, latest = meter.get_availability_window('daily')
+print(f"Data available: {earliest} to {latest}")
+```
+
+**Date Format**: All input dates must be in `YYYY-MM-DD` format (e.g., `2024-12-17`)
+
+**Important**:
+- Electric meter: Due to data availability delays, the end date cannot be later than 2 days ago
+- Water meter: Data is generally available through today for most intervals
 
 ### Command-Line Options
 
