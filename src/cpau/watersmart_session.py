@@ -33,7 +33,7 @@ class WatersmartSessionManager:
         >>> data = response.json()
     """
 
-    def __init__(self, username: str, password: str, headless: bool = True):
+    def __init__(self, username: str, password: str, headless: bool = True, cache_dir: Optional[str] = None):
         """
         Initialize session manager.
 
@@ -41,10 +41,12 @@ class WatersmartSessionManager:
             username: CPAU username
             password: CPAU password
             headless: Run Playwright in headless mode (default: True)
+            cache_dir: Directory for caching cookies (default: ~/.cpau)
         """
         self.username = username
         self.password = password
         self.headless = headless
+        self.cache_dir = cache_dir
 
         self._cookies: Optional[list] = None
         self._authenticated_at: Optional[datetime] = None
@@ -123,6 +125,122 @@ class WatersmartSessionManager:
         logger.info(f"Authentication successful in {elapsed:.1f}s")
         logger.debug(f"Extracted {len(self._cookies)} cookies")
 
+        # Save cookies to cache if cache directory is configured
+        self._save_cookies_to_cache()
+
+    def _get_cache_path(self) -> Optional[str]:
+        """
+        Get the path to the cookie cache file.
+
+        Returns:
+            Path to cache file, or None if caching is disabled
+        """
+        if self.cache_dir is None:
+            return None
+
+        from pathlib import Path
+        import os
+
+        # Expand user home directory
+        cache_dir = Path(self.cache_dir).expanduser()
+
+        # Create directory if it doesn't exist
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set directory permissions to 0700 (user-only)
+        os.chmod(cache_dir, 0o700)
+
+        cache_file = cache_dir / 'watersmart_cookies.json'
+        return str(cache_file)
+
+    def _load_cached_cookies(self) -> bool:
+        """
+        Try to load cookies from cache.
+
+        Returns:
+            True if cookies were loaded successfully, False otherwise
+        """
+        cache_path = self._get_cache_path()
+        if cache_path is None:
+            logger.debug("Cookie caching disabled")
+            return False
+
+        from pathlib import Path
+        import json
+        import os
+
+        cache_file = Path(cache_path)
+        if not cache_file.exists():
+            logger.debug(f"No cookie cache found at {cache_path}")
+            return False
+
+        try:
+            # Check file permissions
+            stat_info = os.stat(cache_path)
+            if stat_info.st_mode & 0o077:
+                logger.warning(f"Cache file {cache_path} has insecure permissions, ignoring")
+                return False
+
+            # Load cache file
+            with open(cache_path, 'r') as f:
+                cache_data = json.load(f)
+
+            # Validate cache data
+            if cache_data.get('username') != self.username:
+                logger.debug(f"Cache is for different user, ignoring")
+                return False
+
+            # Check cache age (max 10 minutes based on Phase 2 testing)
+            auth_time_str = cache_data.get('authenticated_at')
+            if auth_time_str:
+                auth_time = datetime.fromisoformat(auth_time_str)
+                age = datetime.now() - auth_time
+                if age > timedelta(minutes=10):
+                    logger.debug(f"Cache is {age.total_seconds():.0f}s old (max 600s), ignoring")
+                    return False
+                logger.debug(f"Cache is {age.total_seconds():.0f}s old, within valid window")
+
+            # Load cookies
+            self._cookies = cache_data.get('cookies', [])
+            self._authenticated_at = datetime.fromisoformat(auth_time_str) if auth_time_str else None
+
+            logger.info(f"Loaded {len(self._cookies)} cookies from cache (age: {age.total_seconds():.1f}s)")
+            return True
+
+        except Exception as e:
+            logger.warning(f"Failed to load cookie cache: {e}")
+            return False
+
+    def _save_cookies_to_cache(self) -> None:
+        """
+        Save current cookies to cache file.
+        """
+        cache_path = self._get_cache_path()
+        if cache_path is None or self._cookies is None:
+            return
+
+        import json
+        import os
+
+        try:
+            cache_data = {
+                'username': self.username,
+                'authenticated_at': self._authenticated_at.isoformat() if self._authenticated_at else None,
+                'cookies': self._cookies
+            }
+
+            # Write cache file
+            with open(cache_path, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+
+            # Set file permissions to 0600 (user-only read/write)
+            os.chmod(cache_path, 0o600)
+
+            logger.debug(f"Saved {len(self._cookies)} cookies to cache: {cache_path}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save cookie cache: {e}")
+
     def is_authenticated(self) -> bool:
         """
         Check if we have valid authentication cookies.
@@ -145,7 +263,11 @@ class WatersmartSessionManager:
         Raises:
             Exception: If authentication fails
         """
-        # Authenticate if needed
+        # Try loading cached cookies first (unless forcing refresh)
+        if not force_refresh and not self.is_authenticated():
+            self._load_cached_cookies()
+
+        # Authenticate if still not authenticated
         if force_refresh or not self.is_authenticated():
             self.authenticate()
 

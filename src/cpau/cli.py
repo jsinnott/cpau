@@ -216,6 +216,13 @@ class CpauWaterCli(BaseApp):
         )
 
         parser.add_argument(
+            '--cache-dir',
+            type=str,
+            default='~/.cpau',
+            help='Directory for caching authentication cookies (default: ~/.cpau)'
+        )
+
+        parser.add_argument(
             'start_date',
             type=str,
             help='Start date for data retrieval in YYYY-MM-DD format (e.g., 2024-12-01)'
@@ -278,7 +285,8 @@ class CpauWaterCli(BaseApp):
             meter = CpauWaterMeter(
                 username=creds['userid'],
                 password=creds['password'],
-                headless=True
+                headless=True,
+                cache_dir=self.args.cache_dir
             )
 
             # Get usage data

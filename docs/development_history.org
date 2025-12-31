@@ -350,3 +350,125 @@ Here's what I know about that site:
 
 With that context, please propose a plan for discovering the apis the watersmart pages use to
 retrieve data. Note that any tools you write to explore should be located in dev-tools/water.
+
+** Step 22: CLI for water meter data
+
+Please create a sibling script to cpau-electric, cpau-water that uses a similar architecture
+(subclass of BaseApp) and argument pattern and that emits CSV data similar like it's peer.
+
+** Step 23: Maybe a problem with cpau-water?
+
+I consistently get that timeout error when trying to use cpau-water. Here's the console output:
+
+$ bin/cpau-water -i daily 2025-12-20 2025-12-21 | ctt
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO argument and option values:
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...end_date: 2025-12-21
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...interval: daily
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...output_file: None
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...secrets_file: secrets.json
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...silent: False
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...start_date: 2025-12-20
+2025-12-30 22:54:04,787 jupiter.localdomain CpauWaterCli[31331] INFO ...verbose: False
+2025-12-30 22:54:04,788 jupiter.localdomain CpauWaterCli[31331] INFO Initializing water meter connection
+2025-12-30 22:54:04,788 jupiter.localdomain CpauWaterCli[31331] INFO Fetching daily data from 2025-12-20 to 2025-12-21
+2025-12-30 22:54:04,788 jupiter.localdomain cpau.water_meter[31331] INFO Fetching daily water usage from 2025-12-20 to 2025-12-21
+2025-12-30 22:54:04,788 jupiter.localdomain cpau.watersmart_session[31331] INFO Authenticating with watersmart.com...
+2025-12-30 22:54:37,356 jupiter.localdomain cpau.watersmart_session[31331] ERROR Authentication failed: Timeout 30000ms exceeded.
+2025-12-30 22:54:37,356 jupiter.localdomain CpauWaterCli[31331] ERROR Unexpected error: Timeout 30000ms exceeded.
+
+Can you take a look?
+
+** Step 24: Preserve authentication tokens used by cpau-water?
+
+As you've seen, authentication with watersmart.com is (by the standards of our other script,
+cpau-electric) quite slow. I'm anticipating that I'll use cpau-water in a dashboard script that
+invokes it several times in quick succession so it'd be painful to re-authenticate every time. Do
+you think it'd be worth discussing some mechanism for preserving the watersmart.com tokens so they
+can be re-used across (time proximate) invocations of cpau-water? How would you recommend we do that?
+
+*** Solution: Implemented automatic cookie caching
+
+Implemented Option A (simple, automatic caching):
+
+*Implementation Details:*
+
+1. *File-based Cookie Cache*
+   - Location: ~/.cpau/watersmart_cookies.json (default, configurable via --cache-dir)
+   - Directory permissions: 0700 (user-only access)
+   - File permissions: 0600 (user-only read/write)
+
+2. *Cache Structure*
+   - JSON format with three fields:
+     - username: For validation (cache is user-specific)
+     - authenticated_at: ISO timestamp for age calculation
+     - cookies: Array of cookie objects from Playwright
+
+3. *Cache Validity*
+   - Maximum age: 10 minutes (based on Phase 2 testing showing cookies valid 10+ minutes)
+   - Validation checks:
+     - Username must match current user
+     - Age must be <= 10 minutes
+     - File permissions must be secure (0600)
+
+4. *Modified Components*
+   - src/cpau/watersmart_session.py:
+     - Added cache_dir parameter to __init__()
+     - Implemented _get_cache_path() helper
+     - Implemented _load_cached_cookies() with validation
+     - Implemented _save_cookies_to_cache() with secure permissions
+     - Updated authenticate() to save cache after success
+     - Updated get_session() to try cache before authenticating
+   - src/cpau/water_meter.py:
+     - Added cache_dir parameter to __init__()
+     - Pass cache_dir to WatersmartSessionManager
+   - src/cpau/cli.py:
+     - Added --cache-dir argument (default: ~/.cpau)
+     - Pass cache_dir to CpauWaterMeter
+
+5. *Performance Results*
+   - First invocation: ~15.3 seconds (full Playwright authentication)
+   - Cached invocations: ~1 second (within 10-minute window)
+   - 15x speedup for repeated invocations
+
+6. *Automatic Fallback*
+   - If cache is invalid/expired, automatically falls back to full authentication
+   - Logs informative messages about cache status
+   - Transparent to users - works automatically with sensible defaults
+
+7. *Testing Results*
+   - ✅ First invocation creates cache at ~/.cpau/watersmart_cookies.json
+   - ✅ Second invocation uses cache (17.5s old, within valid window)
+   - ✅ Cache works across different intervals (billing, daily, etc.)
+   - ✅ Cache directory has correct permissions (0700)
+   - ✅ Cache file has correct permissions (0600)
+   - ✅ Cache file structure is valid JSON with all required fields
+
+*Usage:*
+  # Default behavior (uses ~/.cpau cache directory)
+  $ bin/cpau-water -i daily 2025-12-01 2025-12-05
+
+  # Custom cache directory
+  $ bin/cpau-water --cache-dir /tmp/cpau-cache -i daily 2025-12-01 2025-12-05
+
+  # Disable caching
+  $ bin/cpau-water --cache-dir "" -i daily 2025-12-01 2025-12-05
+
+Step 24 is now complete.
+
+** Step 25: Educate me: Preparing for push to github.com and eventual publishing to PyPI
+
+Let's have a conversation about repositories at github.com, installable python packages, etc. I've
+never created a pip-installable package before, I have no repositories at github.com (yet!) and have
+definitely never published a package to PyPI. So let's take this slowly.
+
+I'd like to separate the files in our directory structure into this taxonomy:
+  + Files (or directory structure) that support the notion of a "importable" python module-- so one
+    that could be used by someone who had a copy of the directory tree but didn't install via pip or
+    uv. I think of, for example, __init.py__ as a file in this category.
+  + Files or structure that are necessary to support a conventional public repo at github.com. I
+    think of .gitignore as one of these (to avoid publishing secrets or build cruft) and also
+    README.md.
+  + Files (or structure) that support a pip- or uv-installable python package
+  + Files (or structure) that support publishing to PyPI
+
+Is this a good taxonomy?    

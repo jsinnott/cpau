@@ -47,7 +47,7 @@ class CpauWaterMeter:
     # Base URL for watersmart APIs
     _API_BASE_URL = 'https://paloalto.watersmart.com/index.php/rest/v1/Chart/'
 
-    def __init__(self, username: str, password: str, headless: bool = True):
+    def __init__(self, username: str, password: str, headless: bool = True, cache_dir: Optional[str] = None):
         """
         Initialize water meter with CPAU credentials.
 
@@ -55,14 +55,16 @@ class CpauWaterMeter:
             username: CPAU username
             password: CPAU password
             headless: Run browser in headless mode (default: True)
+            cache_dir: Directory for caching authentication cookies (default: ~/.cpau)
+                      Set to None to disable caching.
 
         Note:
             First API call will trigger Playwright authentication (~15 seconds).
-            Subsequent calls reuse the session cookies (<1 second each).
+            Subsequent calls within 10 minutes reuse cached cookies (<1 second).
         """
         self.username = username
         self.password = password
-        self._session_manager = WatersmartSessionManager(username, password, headless)
+        self._session_manager = WatersmartSessionManager(username, password, headless, cache_dir)
 
         logger.debug(f"Initialized CpauWaterMeter for user {username}")
 
