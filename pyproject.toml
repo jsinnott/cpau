@@ -9,7 +9,7 @@ description = "Python library and CLI tools for City of Palo Alto Utilities mete
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-    {name = "CPAU Contributors"}
+    {name = "Joe Sinnott", email = "joe@jsinnott.net"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -37,15 +37,20 @@ dev = [
     "mypy",
     "types-requests",
 ]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinx-autodoc-typehints>=1.24",
+]
 
 [project.scripts]
 cpau-electric = "cpau.cli:main_electric"
 cpau-water = "cpau.cli:main_water"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/cpau"
-Repository = "https://github.com/yourusername/cpau.git"
-Issues = "https://github.com/yourusername/cpau/issues"
+Homepage = "https://github.com/jsinnott/cpau"
+Repository = "https://github.com/jsinnott/cpau.git"
+Issues = "https://github.com/jsinnott/cpau/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
