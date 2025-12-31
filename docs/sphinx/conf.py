@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 project = 'CPAU'
 copyright = '2025, Joe Sinnott'
 author = 'Joe Sinnott'
-release = '0.1.0'
+release = '1.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
