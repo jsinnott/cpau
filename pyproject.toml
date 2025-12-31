@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cpau-api"
+name = "cpau"
 version = "0.1.0"
 description = "Python library and CLI tools for City of Palo Alto Utilities meter data"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-    {name = "CPAU API Contributors"}
+    {name = "CPAU Contributors"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -38,18 +38,18 @@ dev = [
 ]
 
 [project.scripts]
-cpau-electric = "cpau_api.cli:main_electric"
+cpau-electric = "cpau.cli:main_electric"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/cpau-api"
-Repository = "https://github.com/yourusername/cpau-api.git"
-Issues = "https://github.com/yourusername/cpau-api/issues"
+Homepage = "https://github.com/yourusername/cpau"
+Repository = "https://github.com/yourusername/cpau.git"
+Issues = "https://github.com/yourusername/cpau/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-cpau_api = ["py.typed"]
+cpau = ["py.typed"]
 
 [tool.black]
 line-length = 100

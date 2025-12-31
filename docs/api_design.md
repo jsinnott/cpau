@@ -442,7 +442,7 @@ class CpauMeterNotFoundError(CpauError):
 ### Basic Usage
 
 ```python
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 from datetime import date
 
 # Create session and login
@@ -464,7 +464,7 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
 ### Retrieving Hourly Data
 
 ```python
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 from datetime import date
 
 with CpauApiSession(userid='myuser', password='mypass') as session:
@@ -484,7 +484,7 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
 ### Streaming Large Date Ranges
 
 ```python
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 from datetime import date
 
 with CpauApiSession(userid='myuser', password='mypass') as session:
@@ -503,7 +503,7 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
 ### Multiple Meters
 
 ```python
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 
 with CpauApiSession(userid='myuser', password='mypass') as session:
     # Get all electric meters (typically just one, but API supports multiple)
@@ -552,7 +552,7 @@ with CpauApiSession(userid='myuser', password='mypass') as session:
 Proposed module structure:
 
 ```
-cpau_api/
+cpau/
     __init__.py          # Exports CpauApiSession, CpauElectricMeter, exceptions
     session.py           # CpauApiSession implementation
     meter.py             # CpauMeter base class
@@ -593,7 +593,7 @@ The CLI script will be refactored to become a thin wrapper around the library:
 
 ```python
 #!/usr/bin/env python3
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 from baseapp import BaseApp
 import csv
 import sys

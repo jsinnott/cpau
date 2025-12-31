@@ -312,3 +312,10 @@ interval type as a parameter? One api that returns both start and end? Seems lik
 day of data available-- how would we find it?
 
 Please share your thoughts before we decide how to implement.
+
+** Step 20: Improve the package name
+
+I believe we're on a path to create a publicly installable Python package called "cpau_api". I've
+just checked PyPI and there is currently no package named "cpau" so I'd like to claim that name.
+
+Please explain what changes need to be made to use the name "cpau"

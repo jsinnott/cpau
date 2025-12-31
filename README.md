@@ -20,14 +20,14 @@ Provide programmatic access to historical electricity usage data from the CPAU c
 
 #### For Users (from PyPI - when published)
 ```bash
-pip install cpau-api
+pip install cpau
 ```
 
 #### For Development
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cpau-api.git
-cd cpau-api
+git clone https://github.com/yourusername/cpau.git
+cd cpau
 
 # Install in editable mode
 pip install -e .
@@ -66,7 +66,7 @@ cpau-electric --interval monthly 2025-01-01 > monthly.csv
 ### Library Usage
 
 ```python
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 from datetime import date
 
 # Create a session and login
@@ -420,8 +420,8 @@ For date ranges longer than 30 days, the script makes multiple API calls and fil
 ## Repository Structure
 
 ```
-cpau-api/
-├── src/cpau_api/          # Main library package
+cpau/
+├── src/cpau/              # Main library package
 │   ├── __init__.py        # Public API exports
 │   ├── session.py         # CpauApiSession class
 │   ├── meter.py           # Base meter classes

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for the cpau_api library.
+Test script for the cpau library.
 
 This script tests basic functionality of the CPAU API library by fetching
 a small amount of data using the library interface.
@@ -10,10 +10,10 @@ import json
 import sys
 from datetime import date, timedelta
 
-# Add src directory to path to import cpau_api
+# Add src directory to path to import cpau
 sys.path.insert(0, '/Users/jsinnott/code/cpau-scrape/src')
 
-from cpau_api import CpauApiSession
+from cpau import CpauApiSession
 
 
 def main():
