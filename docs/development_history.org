@@ -319,3 +319,34 @@ I believe we're on a path to create a publicly installable Python package called
 just checked PyPI and there is currently no package named "cpau" so I'd like to claim that name.
 
 Please explain what changes need to be made to use the name "cpau"
+
+** Step 21: Plan for adding support for water meter data
+
+Goal: Create a sibling class to our existing electric meter class that is a water meter class and
+that provides apis for retrieving water consumption data. 
+
+CPAU provides water meter data using a different web page (very different interface) than they do
+for electric meter data. It seems like CPAU has contracted with a company that exposes their
+(CPAU's) data through a watersmart.com site-- so CPAU's integration is at paloalto.watersmart.com.
+
+Here's what I know about that site:
+
+  + The watersmart.com portal for CPAU uses the same authentication mechanism as the electric meter
+    data site. It looks like (I'm not sure-- only inferring this from watching redirect URLs) the
+    sites are exchanging SAML tokens.
+  + There are two pages on the watersmart.com site that related to meter data and that therefore
+    might be useful for getting at raw water meter data:
+    + The first page is the the "track usage" page. It displays several charts that are clearly
+      backed by meter data. It looks like the one chart that displays hourly data is able to show
+      data back to mid-September 2024. The "seasonal use" chart claims to show either daily or
+      monthly data but doesn't seem to actually display the data you'd expect it to. The url of the
+      "track usage" page is https://paloalto.watersmart.com/index.php/trackUsage. Note that the URL
+      suggests a php script.
+    + The second interesting page is the "download your data" page. It provides two download
+      options, one is Billing Period data which appears to be similar to the billing period
+      electrical data and for my meter goes back to 2017. The second option is to download Hourly
+      data which for my meter goes back three months. The URL of the "download your data" page is
+      https://paloalto.watersmart.com/index.php/accountPreferences/download 
+
+With that context, please propose a plan for discovering the apis the watersmart pages use to
+retrieve data. Note that any tools you write to explore should be located in dev-tools/water.
