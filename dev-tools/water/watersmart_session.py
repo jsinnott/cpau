@@ -69,18 +69,39 @@ class WatersmartSessionManager:
                 context = browser.new_context()
                 page = context.new_page()
 
+                # Set longer timeout for authentication (60 seconds)
+                page.set_default_timeout(60000)
+
                 # Step 1: Login to CPAU portal
                 logger.debug("Navigating to CPAU portal...")
-                page.goto('https://mycpau.cityofpaloalto.org/Portal')
+                page.goto('https://mycpau.cityofpaloalto.org/Portal', timeout=60000)
+
+                logger.debug("Filling in credentials...")
                 page.fill('#txtLogin', self.username)
                 page.fill('#txtpwd', self.password)
-                page.press('#txtpwd', 'Enter')
-                page.wait_for_load_state('networkidle')
+
+                logger.debug("Submitting login form...")
+                # Wait for navigation after submitting the form
+                with page.expect_navigation(timeout=60000):
+                    page.press('#txtpwd', 'Enter')
+
+                logger.debug(f"Logged in, current URL: {page.url}")
+                page.wait_for_load_state('domcontentloaded', timeout=60000)
 
                 # Step 2: Navigate to watersmart (triggers SAML flow)
-                logger.debug("Completing SAML authentication...")
-                page.goto('https://paloalto.watersmart.com/index.php/trackUsage')
-                page.wait_for_load_state('networkidle')
+                logger.debug("Navigating to watersmart (SAML flow)...")
+                try:
+                    # Navigate with a more lenient wait condition
+                    page.goto('https://paloalto.watersmart.com/index.php/trackUsage', wait_until='commit', timeout=60000)
+                except Exception as e:
+                    # If navigation times out, check if we're still on a valid page
+                    logger.warning(f"Navigation completed with warning: {e}")
+
+                # Wait a bit for any redirects and page rendering
+                import time
+                time.sleep(3)
+
+                logger.debug(f"Final URL: {page.url}")
 
                 # Verify authentication succeeded
                 if 'login' in page.url.lower() or 'signin' in page.url.lower():
@@ -89,6 +110,8 @@ class WatersmartSessionManager:
                 # Extract cookies
                 self._cookies = context.cookies()
                 self._authenticated_at = datetime.now()
+
+                logger.debug(f"Extracted {len(self._cookies)} cookies from {page.url}")
 
                 browser.close()
 
