@@ -212,6 +212,60 @@ class CpauElectricMeter(CpauMeter):
         """
         return self.get_usage('15min', start_date, end_date)
 
+    def get_availability_window(self, interval: str) -> tuple[Optional[date], Optional[date]]:
+        """
+        Find the earliest and latest dates for which data is available.
+
+        Uses binary search for efficiency (typically 10-15 API calls per boundary).
+
+        Args:
+            interval: One of 'billing', 'monthly', 'daily', 'hourly', '15min'
+
+        Returns:
+            Tuple of (earliest_date, latest_date) or (None, None) if no data found
+
+        Notes:
+            - For 'billing': Scans all billing periods (single API call)
+            - For 'monthly': Returns the daily data availability window (since monthly aggregates daily data)
+            - For other intervals: Uses binary search (10-15 API calls per boundary)
+            - Total execution time: typically 30-60 seconds for intervals requiring binary search
+
+        Raises:
+            ValueError: If interval is invalid
+        """
+        # Validate interval
+        if interval not in self._INTERVAL_MODE_MAP:
+            logger.error(f"Invalid interval: {interval}")
+            raise ValueError(
+                f"Invalid interval '{interval}'. Must be one of: {', '.join(self.get_available_intervals())}"
+            )
+
+        logger.info(f"Finding data availability window for {interval} interval")
+
+        # Monthly aggregation uses daily data availability
+        if interval == 'monthly':
+            logger.debug("Monthly interval: using daily data availability window")
+            return self.get_availability_window('daily')
+
+        mode = self._INTERVAL_MODE_MAP[interval]
+
+        # Billing interval: fetch all and scan
+        if mode == 'M':
+            logger.debug("Billing interval: fetching all billing periods")
+            return self._find_billing_window()
+
+        # Daily/hourly/15min: use binary search
+        logger.debug(f"Using binary search for {interval} interval (mode={mode})")
+        earliest = self._binary_search_earliest(mode, interval)
+        latest = self._binary_search_latest(mode, interval)
+
+        if earliest:
+            logger.info(f"Availability window for {interval}: {earliest} to {latest}")
+        else:
+            logger.info(f"No data found for {interval} interval")
+
+        return (earliest, latest)
+
     def iter_usage(
         self,
         interval: str,
@@ -624,3 +678,168 @@ class CpauElectricMeter(CpauMeter):
             usage_records.append(record)
 
         return usage_records
+
+    def _find_billing_window(self) -> tuple[Optional[date], Optional[date]]:
+        """
+        Find the earliest and latest billing period dates.
+
+        Returns all billing periods and scans for min/max dates.
+        """
+        try:
+            raw_records = self._fetch_monthly_data()
+
+            if not raw_records:
+                logger.debug("No billing period data found")
+                return (None, None)
+
+            earliest_date = None
+            latest_date = None
+
+            for record in raw_records:
+                bill_period = record.get('BillPeriod', '')
+                if ' to ' in bill_period:
+                    try:
+                        period_start_str, period_end_str = bill_period.split(' to ')
+                        period_start_dt = datetime.strptime(period_start_str.strip(), '%m/%d/%y')
+                        period_end_dt = datetime.strptime(period_end_str.strip(), '%m/%d/%y')
+
+                        period_start_date = period_start_dt.date()
+                        period_end_date = period_end_dt.date()
+
+                        if earliest_date is None or period_start_date < earliest_date:
+                            earliest_date = period_start_date
+                        if latest_date is None or period_end_date > latest_date:
+                            latest_date = period_end_date
+
+                    except ValueError as e:
+                        logger.debug(f"Failed to parse billing period '{bill_period}': {e}")
+                        continue
+
+            logger.debug(f"Found billing window: {earliest_date} to {latest_date}")
+            return (earliest_date, latest_date)
+
+        except Exception as e:
+            logger.error(f"Error finding billing window: {e}")
+            return (None, None)
+
+    def _check_data_exists(self, mode: str, check_date: date) -> bool:
+        """
+        Check if data exists for a given date and mode.
+
+        Args:
+            mode: API mode code ('D', 'H', 'MI')
+            check_date: Date to check
+
+        Returns:
+            True if data exists for this date, False otherwise
+        """
+        try:
+            payload = {
+                'UsageOrGeneration': '1',
+                'Type': 'K',
+                'Mode': mode,
+                'strDate': check_date.strftime('%m/%d/%y'),
+                'hourlyType': 'H',
+                'SeasonId': 0,
+                'weatherOverlay': 0,
+                'usageyear': '',
+                'MeterNumber': self.meter_number,
+                'DateFromDaily': '',
+                'DateToDaily': '',
+                'IsTier': True,
+                'IsTou': False
+            }
+
+            data = self._session._make_api_request('LoadUsage', payload)
+            records = data.get('objUsageGenerationResultSetTwo', [])
+
+            # Check if any record matches the requested date
+            # (API may return a window of dates, not just the requested date)
+            check_date_str = check_date.strftime('%m/%d/%y')
+            for record in records:
+                if record.get('UsageDate') == check_date_str:
+                    logger.debug(f"Check {check_date}: data found")
+                    return True
+
+            logger.debug(f"Check {check_date}: no data")
+            return False
+
+        except Exception as e:
+            logger.debug(f"Error checking data for {check_date}: {e}")
+            return False
+
+    def _binary_search_earliest(self, mode: str, interval_name: str) -> Optional[date]:
+        """
+        Use binary search to find the earliest date with data.
+
+        Args:
+            mode: API mode code ('D', 'H', 'MI')
+            interval_name: Interval name for logging (e.g., 'daily', 'hourly')
+
+        Returns:
+            Earliest date with data, or None if no data found
+        """
+        # Search range: 10 years ago to 2 days ago
+        today = date.today()
+        min_date = today - timedelta(days=3650)  # 10 years ago
+        max_date = today - timedelta(days=2)     # 2 days ago (data availability)
+
+        logger.debug(f"Binary search for earliest {interval_name} data: {min_date} to {max_date}")
+
+        left = min_date
+        right = max_date
+        earliest_found = None
+        iterations = 0
+
+        while left <= right:
+            iterations += 1
+            mid = left + (right - left) // 2
+
+            if self._check_data_exists(mode, mid):
+                # Data exists, search earlier
+                earliest_found = mid
+                right = mid - timedelta(days=1)
+            else:
+                # No data, search later
+                left = mid + timedelta(days=1)
+
+        logger.debug(f"Earliest {interval_name} search completed in {iterations} iterations")
+        return earliest_found
+
+    def _binary_search_latest(self, mode: str, interval_name: str) -> Optional[date]:
+        """
+        Use binary search to find the latest date with data.
+
+        Args:
+            mode: API mode code ('D', 'H', 'MI')
+            interval_name: Interval name for logging (e.g., 'daily', 'hourly')
+
+        Returns:
+            Latest date with data, or None if no data found
+        """
+        # Search range: 30 days ago to tomorrow (to handle processing delays)
+        today = date.today()
+        min_date = today - timedelta(days=30)  # Start far enough back
+        max_date = today + timedelta(days=1)   # Check if data is near-real-time
+
+        logger.debug(f"Binary search for latest {interval_name} data: {min_date} to {max_date}")
+
+        left = min_date
+        right = max_date
+        latest_found = None
+        iterations = 0
+
+        while left <= right:
+            iterations += 1
+            mid = left + (right - left) // 2
+
+            if self._check_data_exists(mode, mid):
+                # Data exists, search later
+                latest_found = mid
+                left = mid + timedelta(days=1)
+            else:
+                # No data, search earlier
+                right = mid - timedelta(days=1)
+
+        logger.debug(f"Latest {interval_name} search completed in {iterations} iterations")
+        return latest_found

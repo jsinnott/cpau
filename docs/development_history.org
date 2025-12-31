@@ -299,3 +299,16 @@ that is available.
 
 This also applies to the start date? So if someone requests data from 1970 to 2025, log a warning
 and output the data that is available. Make sense?
+
+** Step 19: Add apis to identify the start and end dates of the available data for a given interval
+
+Previously you wrote a script, dev-tools/electric/find_availability_windows.py, that efficiently
+finds the start and end dates for the availability of data for each interval type. Please
+incorporate that same binary search algorithm to establish availability window boundaries.
+
+What's your guidance on how to structure this api? One method each for the start and end, take an
+interval type as a parameter? One api that returns both start and end? Seems like this could be a
+"needle in a haystack" problem, right? The degenerate case is that for some meter there's only one
+day of data available-- how would we find it?
+
+Please share your thoughts before we decide how to implement.
