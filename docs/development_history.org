@@ -471,4 +471,222 @@ I'd like to separate the files in our directory structure into this taxonomy:
   + Files (or structure) that support a pip- or uv-installable python package
   + Files (or structure) that support publishing to PyPI
 
-Is this a good taxonomy?    
+Is this a good taxonomy?
+
+*** Solution: Prepared repository for GitHub publication
+
+The taxonomy is good conceptually, but in practice there's significant overlap between
+categories. The key insight is that *pyproject.toml* is the single source of truth that
+supports both local pip installation AND PyPI publishing - there's no separate "PyPI config".
+
+*Implementation:*
+
+1. *Created LICENSE file*
+   - MIT License with proper copyright attribution
+   - Copyright holder: Joe Sinnott
+   - Year: 2025
+   - Required for legal use of the package
+
+2. *Updated pyproject.toml*
+   - Author: Changed from "CPAU Contributors" to "Joe Sinnott" with email
+   - GitHub URLs: Updated all URLs from "yourusername" to "jsinnott":
+     - Homepage: https://github.com/jsinnott/cpau
+     - Repository: https://github.com/jsinnott/cpau.git
+     - Issues: https://github.com/jsinnott/cpau/issues
+
+3. *Rewrote README.md for public audience*
+   - Added badges (License, Python version)
+   - Clearer, more concise structure
+   - Quick Start section front and center
+   - Installation instructions for PyPI, GitHub, and development
+   - Comprehensive CLI and library usage examples
+   - Better organized sections (Features, Performance, Troubleshooting)
+   - Added disclaimer about being unofficial/unsupported
+   - Reduced from 595 lines to 383 lines while adding more useful content
+
+*The Four Categories Explained:*
+
+1. *Importable Python Module* (Local Development)
+   - ✅ src/cpau/__init__.py - Makes cpau importable
+   - ✅ src/cpau/*.py - Module files
+   - ✅ Proper package structure with src/ layout
+
+2. *GitHub Repository* (Public Sharing)
+   - ✅ .gitignore - Prevents secrets/cruft from being committed
+   - ✅ README.md - Documentation
+   - ✅ LICENSE - Legal permission to use the code (REQUIRED!)
+   - ❌ Need to update author info and GitHub URLs (completed)
+
+3. *pip/uv Installable Package* (Local Installation)
+   - ✅ pyproject.toml - The key file! (Modern Python packaging)
+   - ✅ [project.scripts] section - Creates cpau-electric and cpau-water commands
+   - ✅ [build-system] - Tells pip/uv how to build
+   - ✅ src/ layout - Best practice for packages
+   - Works now: pip install /path/to/cpau-scrape
+
+4. *PyPI Publishing* (Public Distribution)
+   - ✅ Same pyproject.toml! (No separate config needed)
+   - ✅ Version number (0.1.0)
+   - ✅ Description, dependencies, classifiers
+   - Ready for: python -m build && twine upload dist/*
+
+*Repository is now ready for:*
+- GitHub push to https://github.com/jsinnott/cpau
+- Read the Docs hosting at https://cpau.readthedocs.io
+- PyPI publication (pip install cpau)
+
+Step 25 is now complete.
+
+** Step 26: What about API docs? Python documentation best practices
+
+Question: As a Java developer, part of our build process was generating Javadoc to help
+colleagues use the APIs I'd built. My understanding is that the comment blocks at the top of
+the python methods can be used to do something similar. What are best practices around
+documenting Python APIs?
+
+*** Solution: Set up Sphinx documentation system
+
+Python has a rich documentation ecosystem. The docstrings (triple-quoted strings) in the code
+are Python's equivalent to Javadoc, but they're more powerful - they're not comments, they're
+part of the code and accessible at runtime via help().
+
+*Docstring Format (Google Style):*
+
+Using Google-style docstrings throughout the codebase:
+
+#+begin_src python
+def get_usage(
+    self,
+    interval: str,
+    start_date: date,
+    end_date: Optional[date] = None
+) -> list[UsageRecord]:
+    """
+    Retrieve usage data for the specified interval and date range.
+
+    Args:
+        interval: One of 'billing', 'monthly', 'daily', 'hourly', '15min'
+        start_date: Start date (inclusive)
+        end_date: End date (inclusive). If None, defaults to 2 days ago.
+
+    Returns:
+        List of UsageRecord objects sorted by date
+
+    Raises:
+        ValueError: If interval is invalid or date range is invalid
+        CpauApiError: If API request fails
+
+    Example:
+        >>> meter.get_usage('daily', date(2024, 12, 1))
+        [UsageRecord(...), ...]
+    """
+#+end_src
+
+*Type Hints Complement Docstrings:*
+
+Modern Python (3.8+) separates concerns:
+- Type hints define the signature (what types)
+- Docstrings explain the semantics (what it means, why, how)
+
+*Sphinx Documentation Generator:*
+
+Sphinx is Python's standard documentation generator (equivalent to Javadoc):
+- Parses docstrings from source code
+- Generates HTML/PDF documentation
+- Creates searchable API reference
+- Supports cross-references, examples, tutorials
+- Used by Django, Flask, NumPy, Requests, etc.
+
+*Implementation Details:*
+
+1. *Added documentation dependencies to pyproject.toml*
+   #+begin_src toml
+   [project.optional-dependencies]
+   docs = [
+       "sphinx>=7.0",                      # Core documentation generator
+       "sphinx-rtd-theme>=2.0",            # Professional Read the Docs theme
+       "sphinx-autodoc-typehints>=1.24",  # Better type hint rendering
+   ]
+   #+end_src
+
+2. *Created Sphinx configuration (docs/sphinx/)*
+   - conf.py: Sphinx configuration with Read the Docs theme
+   - index.rst: Main documentation page with overview and navigation
+   - api/session.rst: CpauApiSession documentation
+   - api/electric_meter.rst: CpauElectricMeter documentation
+   - api/water_meter.rst: CpauWaterMeter and WatersmartSessionManager documentation
+   - api/exceptions.rst: Exception class documentation
+   - Makefile: Build automation (make html)
+   - README.md: Documentation build instructions
+
+3. *Documentation Features*
+   - Auto-generated from existing docstrings (no duplication!)
+   - Professional Read the Docs theme
+   - Full-text search functionality
+   - Cross-references between classes/methods
+   - Links to source code
+   - Python module index
+   - Alphabetical index
+   - Supports multiple output formats (HTML, PDF, ePub)
+
+4. *Building the documentation*
+   #+begin_src bash
+   pip install -e ".[docs]"
+   cd docs/sphinx
+   make html
+   open _build/html/index.html
+   #+end_src
+
+5. *Documentation Generated*
+   - Main page (index.html): 41 KB
+   - api/session.html: 59 KB - CpauApiSession class
+   - api/electric_meter.html: 97 KB - CpauElectricMeter class
+   - api/water_meter.html: 101 KB - CpauWaterMeter and WatersmartSessionManager
+   - api/exceptions.html: 44 KB - Exception classes
+   - genindex.html: 45 KB - Alphabetical index
+   - py-modindex.html: 31 KB - Python module index
+   - Full-text search with searchindex.js: 18 KB
+
+*Key Advantages Over Java/Javadoc:*
+
+| Aspect | Java (Javadoc) | Python (Sphinx) |
+|--------|----------------|-----------------|
+| Format | /** ... */ comments | """...""" docstrings |
+| Runtime Access | No | Yes (help(), __doc__) |
+| Generator | javadoc tool | sphinx-build |
+| Hosting | Manual | Read the Docs (automated) |
+| Type Info | In Javadoc tags | Separate type hints |
+| IDE Support | Moderate | Excellent (VSCode, PyCharm) |
+
+*Publishing Options:*
+
+1. *Read the Docs (Recommended)*
+   - Free hosting for open source projects
+   - Automatic builds on every git push
+   - Professional appearance with search
+   - Version support (docs for v0.1.0, v0.2.0, etc.)
+   - Will be available at: https://cpau.readthedocs.io
+
+2. *GitHub Pages*
+   - Host docs directly on GitHub
+   - Available at: https://jsinnott.github.io/cpau
+
+3. *Include in PyPI Package*
+   - README.md shows on PyPI package page
+   - Links to hosted docs work automatically
+
+*Updated .gitignore:*
+
+Added Sphinx build artifacts to prevent committing generated HTML:
+- docs/sphinx/_build/
+- docs/sphinx/_static/
+- docs/sphinx/_templates/
+
+Step 26 is now complete.
+
+The docstrings serve triple duty:
+1. IDE tooltips - When hovering over methods in VS Code/PyCharm
+2. Runtime help - Available via help() in Python REPL
+3. HTML documentation - Professional web docs via Sphinx
+
+All generated from the same docstrings that were already in the code!
