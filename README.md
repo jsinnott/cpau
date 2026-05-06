@@ -407,6 +407,9 @@ cpau/
 
 ## Changelog
 
+### 1.3.2
+- Fix electric billing data availability/parsing. The CPAU LoadUsage endpoint now returns billing records with an empty `BillPeriod` field, populating separate `FromDate` / `ToDate` fields instead. The parser previously fell back to a Year/Month synthesis that produced the right grouping for billing usage but dropped every record from `cpau-availability` and emitted blank `billing_period_start` / `billing_period_end` columns. Both paths now fall back to `FromDate` / `ToDate` when `BillPeriod` is empty.
+
 ### 1.3.1
 - Fix the unit-test suite for the electric and water meters. The fixtures introduced in 1.0.0 used field names and shapes that didn't match what the code parses, and `test_water_meter.py` patched a name that was never imported, so 21 tests had been silently failing. All 63 tests now pass.
 

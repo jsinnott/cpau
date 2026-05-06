@@ -131,3 +131,38 @@ EMPTY_USAGE_RESPONSE = {
         "objUsageGenerationResultSetTwo": []
     })
 }
+
+# Real-world variant: as of mid-2025 the LoadUsage endpoint returns billing
+# records with an empty BillPeriod field and instead populates separate
+# FromDate / ToDate fields. The parser must fall back to those when
+# BillPeriod is empty.
+BILLING_USAGE_RESPONSE_FROM_DATE = {
+    "d": json.dumps({
+        "objUsageGenerationResultSetTwo": [
+            {
+                "Year": 2025, "Month": 11,
+                "BillPeriod": "",
+                "FromDate": "11/01/25", "ToDate": "11/30/25",
+                "UsageType": "IUsage", "UsageValue": 689.4,
+            },
+            {
+                "Year": 2025, "Month": 11,
+                "BillPeriod": "",
+                "FromDate": "11/01/25", "ToDate": "11/30/25",
+                "UsageType": "Eusage", "UsageValue": 156.2,
+            },
+            {
+                "Year": 2025, "Month": 12,
+                "BillPeriod": "",
+                "FromDate": "12/01/25", "ToDate": "12/31/25",
+                "UsageType": "IUsage", "UsageValue": 712.5,
+            },
+            {
+                "Year": 2025, "Month": 12,
+                "BillPeriod": "",
+                "FromDate": "12/01/25", "ToDate": "12/31/25",
+                "UsageType": "Eusage", "UsageValue": 168.3,
+            },
+        ]
+    })
+}

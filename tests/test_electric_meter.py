@@ -17,6 +17,7 @@ from tests.fixtures.electric_responses import (
     HOURLY_USAGE_RESPONSE,
     FIFTEEN_MIN_USAGE_RESPONSE,
     BILLING_USAGE_RESPONSE,
+    BILLING_USAGE_RESPONSE_FROM_DATE,
     EMPTY_USAGE_RESPONSE,
 )
 
@@ -251,8 +252,47 @@ class TestCpauElectricMeter:
         assert len(records) == 2
         assert records[0].import_kwh == 689.4
         assert records[0].export_kwh == 156.2
+        assert records[0].billing_period_start == '2024-11-01'
+        assert records[0].billing_period_end == '2024-11-30'
+        assert records[0].billing_period_length == 30
         assert records[1].import_kwh == 712.5
         assert records[1].export_kwh == 168.3
+
+    def test_get_billing_usage_with_from_date_fallback(self):
+        """When the API returns empty BillPeriod, the parser must fall
+        back to the per-record FromDate/ToDate fields. This case showed
+        up in the real API response after mid-2025 and silently dropped
+        every billing record from the availability window output."""
+        meter, mock_session = self.create_mock_meter()
+
+        response_data = json.loads(BILLING_USAGE_RESPONSE_FROM_DATE['d'])
+        mock_session._make_api_request.return_value = response_data
+
+        records = meter.get_billing_usage(
+            start_date=date(2025, 11, 1),
+            end_date=date(2025, 12, 31),
+        )
+
+        assert len(records) == 2
+        assert records[0].import_kwh == 689.4
+        assert records[0].billing_period_start == '2025-11-01'
+        assert records[0].billing_period_end == '2025-11-30'
+        assert records[0].billing_period_length == 30
+        assert records[1].billing_period_start == '2025-12-01'
+        assert records[1].billing_period_end == '2025-12-31'
+        assert records[1].billing_period_length == 31
+
+    def test_get_availability_window_billing_uses_from_date(self):
+        """_find_billing_window must also accept FromDate/ToDate."""
+        meter, mock_session = self.create_mock_meter()
+
+        response_data = json.loads(BILLING_USAGE_RESPONSE_FROM_DATE['d'])
+        mock_session._make_api_request.return_value = response_data
+
+        earliest, latest = meter.get_availability_window('billing')
+
+        assert earliest == date(2025, 11, 1)
+        assert latest == date(2025, 12, 31)
 
     def test_invalid_interval(self):
         """Test that invalid interval raises ValueError."""

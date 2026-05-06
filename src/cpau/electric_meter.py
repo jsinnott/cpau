@@ -559,52 +559,27 @@ class CpauElectricMeter(CpauMeter):
 
         for record in raw_records:
             if is_billing:
-                # Billing data: filter to billing periods that overlap with requested date range
-                bill_period = record.get('BillPeriod', '')
+                period_start_dt, period_end_dt = self._parse_billing_period(record)
 
-                # Parse billing period dates (format: "MM/DD/YY to MM/DD/YY")
-                if ' to ' in bill_period:
-                    try:
-                        period_start_str, period_end_str = bill_period.split(' to ')
-                        period_start_dt = datetime.strptime(period_start_str.strip(), '%m/%d/%y')
-                        period_end_dt = datetime.strptime(period_end_str.strip(), '%m/%d/%y')
+                # Filter to billing periods that overlap the requested range.
+                # If the period boundaries can't be parsed, include the record
+                # rather than silently dropping it.
+                if period_start_dt and period_end_dt:
+                    if period_end_dt.date() < start_date or period_start_dt.date() > end_date:
+                        continue
 
-                        # Check if billing period overlaps with requested date range
-                        period_start_date = period_start_dt.date()
-                        period_end_date = period_end_dt.date()
-
-                        if period_end_date < start_date or period_start_date > end_date:
-                            continue  # Skip billing periods outside the requested range
-                    except ValueError:
-                        # If we can't parse the billing period, include it to be safe
-                        pass
-
-                # Billing data: group by Year-Month
+                # Group by Year-Month
                 key = f"{record['Year']}-{record['Month']:02d}"
                 if key not in grouped_data:
-                    # Parse the billing period to extract start, end, and length
-                    billing_start = None
-                    billing_end = None
-                    billing_length = None
-
-                    if ' to ' in bill_period:
-                        period_start_str, period_end_str = bill_period.split(' to ')
-                        try:
-                            period_start_dt = datetime.strptime(period_start_str.strip(), '%m/%d/%y')
-                            period_end_dt = datetime.strptime(period_end_str.strip(), '%m/%d/%y')
-
-                            # Convert to YYYY-MM-DD format
-                            billing_start = period_start_dt.strftime('%Y-%m-%d')
-                            billing_end = period_end_dt.strftime('%Y-%m-%d')
-
-                            # Calculate length in days (inclusive)
-                            billing_length = (period_end_dt.date() - period_start_dt.date()).days + 1
-
-                            # Use the start date as the record datetime
-                            period_datetime = period_start_dt
-                        except ValueError:
-                            period_datetime = datetime(record['Year'], record['Month'], 1)
+                    if period_start_dt and period_end_dt:
+                        billing_start = period_start_dt.strftime('%Y-%m-%d')
+                        billing_end = period_end_dt.strftime('%Y-%m-%d')
+                        billing_length = (period_end_dt.date() - period_start_dt.date()).days + 1
+                        period_datetime = period_start_dt
                     else:
+                        billing_start = None
+                        billing_end = None
+                        billing_length = None
                         period_datetime = datetime(record['Year'], record['Month'], 1)
 
                     grouped_data[key] = {
@@ -679,6 +654,39 @@ class CpauElectricMeter(CpauMeter):
 
         return usage_records
 
+    @staticmethod
+    def _parse_billing_period(record: dict) -> tuple[Optional[datetime], Optional[datetime]]:
+        """Return (start, end) datetimes for a billing record.
+
+        Tries the legacy ``BillPeriod`` field (formatted as
+        ``"MM/DD/YY to MM/DD/YY"``) first, then falls back to the separate
+        ``FromDate`` / ``ToDate`` fields the API now populates instead.
+        Returns ``(None, None)`` if neither yields parseable dates.
+        """
+        bill_period = record.get('BillPeriod') or ''
+        if ' to ' in bill_period:
+            try:
+                start_str, end_str = bill_period.split(' to ')
+                return (
+                    datetime.strptime(start_str.strip(), '%m/%d/%y'),
+                    datetime.strptime(end_str.strip(), '%m/%d/%y'),
+                )
+            except ValueError:
+                pass
+
+        from_date = record.get('FromDate')
+        to_date = record.get('ToDate')
+        if from_date and to_date:
+            try:
+                return (
+                    datetime.strptime(from_date, '%m/%d/%y'),
+                    datetime.strptime(to_date, '%m/%d/%y'),
+                )
+            except ValueError:
+                pass
+
+        return (None, None)
+
     def _find_billing_window(self) -> tuple[Optional[date], Optional[date]]:
         """
         Find the earliest and latest billing period dates.
@@ -696,24 +704,17 @@ class CpauElectricMeter(CpauMeter):
             latest_date = None
 
             for record in raw_records:
-                bill_period = record.get('BillPeriod', '')
-                if ' to ' in bill_period:
-                    try:
-                        period_start_str, period_end_str = bill_period.split(' to ')
-                        period_start_dt = datetime.strptime(period_start_str.strip(), '%m/%d/%y')
-                        period_end_dt = datetime.strptime(period_end_str.strip(), '%m/%d/%y')
+                period_start_dt, period_end_dt = self._parse_billing_period(record)
+                if period_start_dt is None or period_end_dt is None:
+                    continue
 
-                        period_start_date = period_start_dt.date()
-                        period_end_date = period_end_dt.date()
+                period_start_date = period_start_dt.date()
+                period_end_date = period_end_dt.date()
 
-                        if earliest_date is None or period_start_date < earliest_date:
-                            earliest_date = period_start_date
-                        if latest_date is None or period_end_date > latest_date:
-                            latest_date = period_end_date
-
-                    except ValueError as e:
-                        logger.debug(f"Failed to parse billing period '{bill_period}': {e}")
-                        continue
+                if earliest_date is None or period_start_date < earliest_date:
+                    earliest_date = period_start_date
+                if latest_date is None or period_end_date > latest_date:
+                    latest_date = period_end_date
 
             logger.debug(f"Found billing window: {earliest_date} to {latest_date}")
             return (earliest_date, latest_date)
