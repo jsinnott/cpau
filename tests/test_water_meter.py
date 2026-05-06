@@ -3,7 +3,7 @@
 import pytest
 from datetime import date, datetime
 from unittest.mock import Mock, MagicMock, patch
-import json
+import requests
 
 from cpau import CpauWaterMeter
 from cpau.meter import UsageRecord
@@ -18,35 +18,58 @@ from tests.fixtures.water_responses import (
 )
 
 
+def _setup_session_manager(mock_manager_class, response_payload=None, side_effect=None):
+    """Wire up a mocked WatersmartSessionManager class so that
+    `manager.get_session().get(url, ...)` returns a configurable response.
+
+    Returns the (manager_instance_mock, session_mock) for further customization.
+    """
+    mock_manager = MagicMock()
+    mock_manager_class.return_value = mock_manager
+
+    mock_session = MagicMock()
+    mock_manager.get_session.return_value = mock_session
+
+    if response_payload is not None:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = response_payload
+        mock_response.raise_for_status = Mock()
+        mock_session.get.return_value = mock_response
+
+    if side_effect is not None:
+        mock_session.get.side_effect = side_effect
+
+    return mock_manager, mock_session
+
+
 @pytest.mark.unit
 class TestCpauWaterMeter:
     """Tests for CpauWaterMeter water usage data retrieval."""
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    def test_init_with_credentials(self, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_init_with_credentials(self, mock_manager_class, mock_credentials):
         """Test initializing water meter with credentials."""
-        # Mock session
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        mock_manager, _ = _setup_session_manager(mock_manager_class)
 
-        # Create water meter
         meter = CpauWaterMeter(
             username=mock_credentials['userid'],
             password=mock_credentials['password']
         )
 
-        # Verify session was created
-        mock_watersmart_session.assert_called_once()
-        assert meter._session == mock_session
+        # Verify the manager was constructed and stored on the meter.
+        mock_manager_class.assert_called_once()
+        assert meter._session_manager is mock_manager
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    def test_get_available_intervals(self, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_available_intervals(self, mock_manager_class, mock_credentials):
         """Test getting available intervals."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class)
 
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         intervals = meter.get_available_intervals()
 
         assert 'billing' in intervals
@@ -55,30 +78,20 @@ class TestCpauWaterMeter:
         assert 'hourly' in intervals
         assert '15min' not in intervals  # Water meter doesn't support 15min
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_get_daily_usage(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_daily_usage(self, mock_manager_class, mock_credentials):
         """Test retrieving daily water usage data."""
-        # Mock session
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=DAILY_USAGE_RESPONSE)
 
-        # Mock API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = DAILY_USAGE_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get usage
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         records = meter.get_daily_usage(
             start_date=date(2024, 12, 1),
             end_date=date(2024, 12, 5)
         )
 
-        # Verify results
         assert len(records) == 5
         assert records[0].date == datetime(2024, 12, 1)
         assert records[0].import_kwh == 168.309  # Gallons in import_kwh field
@@ -88,101 +101,80 @@ class TestCpauWaterMeter:
         assert records[1].date == datetime(2024, 12, 2)
         assert records[1].import_kwh == 222.169
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_get_hourly_usage(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_hourly_usage(self, mock_manager_class, mock_credentials):
         """Test retrieving hourly water usage data."""
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=HOURLY_USAGE_RESPONSE)
 
-        # Mock API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = HOURLY_USAGE_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get usage
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         records = meter.get_hourly_usage(
             start_date=date(2023, 12, 17),
             end_date=date(2023, 12, 17)
         )
 
-        # Verify results
         assert len(records) == 3
         assert records[0].import_kwh == 12.5
         assert records[1].import_kwh == 15.3
         assert records[2].import_kwh == 8.7
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_get_billing_usage(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_billing_usage(self, mock_manager_class, mock_credentials):
         """Test retrieving billing period water usage data."""
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=BILLING_USAGE_RESPONSE)
 
-        # Mock API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = BILLING_USAGE_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get usage
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         records = meter.get_billing_usage(
             start_date=date(2024, 11, 1),
             end_date=date(2024, 12, 31)
         )
 
-        # Verify results
         assert len(records) == 2
         assert records[0].import_kwh == 9724.0
-        assert records[0].billing_period_start == datetime(2024, 11, 1)
-        assert records[0].billing_period_end == datetime(2024, 11, 30, 23, 59, 59)
+        # billing_period_start/end are ISO date strings (per UsageRecord
+        # dataclass), not datetimes; the parser reformats the API's
+        # full-precision datetime into 'YYYY-MM-DD'.
+        assert records[0].billing_period_start == '2024-11-01'
+        assert records[0].billing_period_end == '2024-11-30'
         assert records[0].billing_period_length == 30
 
         assert records[1].import_kwh == 10156.5
-        assert records[1].billing_period_start == datetime(2024, 12, 1)
+        assert records[1].billing_period_start == '2024-12-01'
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_get_monthly_usage(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_monthly_usage(self, mock_manager_class, mock_credentials):
         """Test retrieving monthly aggregated water usage."""
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=MONTHLY_USAGE_RESPONSE)
 
-        # Mock API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = MONTHLY_USAGE_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get usage
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         records = meter.get_monthly_usage(
             start_date=date(2024, 11, 1),
             end_date=date(2024, 11, 30)
         )
 
-        # Verify results - should have one record for November
+        # Monthly aggregates daily data into one record per calendar month.
         assert len(records) == 1
         assert records[0].date == datetime(2024, 11, 1)
-        # Sum of all daily values: 150+160+...+255 = 5625.0
-        assert records[0].import_kwh == 5625.0
+        # Sum of all 30 daily fixture values for November 2024.
+        assert records[0].import_kwh == 5755.0
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    def test_invalid_interval(self, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_invalid_interval(self, mock_manager_class, mock_credentials):
         """Test that invalid interval raises ValueError."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class)
 
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
 
         with pytest.raises(ValueError, match="Invalid interval"):
             meter.get_usage(
@@ -191,13 +183,15 @@ class TestCpauWaterMeter:
                 end_date=date(2024, 12, 31)
             )
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    def test_invalid_date_range(self, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_invalid_date_range(self, mock_manager_class, mock_credentials):
         """Test that invalid date range raises ValueError."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class)
 
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
 
         with pytest.raises(ValueError, match="end_date.*must be >= start_date"):
             meter.get_usage(
@@ -206,84 +200,63 @@ class TestCpauWaterMeter:
                 end_date=date(2024, 12, 1)  # End before start
             )
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_empty_response(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_empty_response(self, mock_manager_class, mock_credentials):
         """Test handling empty API response."""
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=EMPTY_USAGE_RESPONSE)
 
-        # Mock empty response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = EMPTY_USAGE_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get usage
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         records = meter.get_hourly_usage(
             start_date=date(2024, 12, 1),
             end_date=date(2024, 12, 31)
         )
 
-        # Verify empty results
         assert len(records) == 0
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_get_availability_window(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_get_availability_window(self, mock_manager_class, mock_credentials):
         """Test getting data availability window."""
-        mock_session = MagicMock()
-        mock_session.get_cookies.return_value = {"session": "mock_cookie"}
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class, response_payload=AVAILABILITY_RESPONSE)
 
-        # Mock API response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = AVAILABILITY_RESPONSE
-        mock_response.raise_for_status = Mock()
-        mock_requests_get.return_value = mock_response
-
-        # Create meter and get availability
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
         earliest, latest = meter.get_availability_window('daily')
 
-        # Verify results
         assert earliest == date(2017, 1, 1)
         assert latest == date(2024, 12, 31)
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    def test_default_end_date(self, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_default_end_date(self, mock_manager_class, mock_credentials):
         """Test that end_date defaults to today for water meter."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(mock_manager_class)
 
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
 
-        # Patch the actual data fetch method to verify it's called
         with patch.object(meter, '_fetch_daily_data') as mock_fetch:
             mock_fetch.return_value = DAILY_USAGE_RESPONSE
-
-            # Get usage without end_date
             meter.get_daily_usage(start_date=date(2024, 12, 1))
-
-            # Verify method was called (end_date should default to today)
             assert mock_fetch.called
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_timeout_handling(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_timeout_handling(self, mock_manager_class, mock_credentials):
         """Test handling of timeout errors."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(
+            mock_manager_class,
+            side_effect=requests.exceptions.Timeout(),
+        )
 
-        # Mock timeout error
-        import requests
-        mock_requests_get.side_effect = requests.exceptions.Timeout()
-
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
 
         with pytest.raises(TimeoutError):
             meter.get_daily_usage(
@@ -291,18 +264,18 @@ class TestCpauWaterMeter:
                 end_date=date(2024, 12, 5)
             )
 
-    @patch('cpau.water_meter.WaterSmartSession')
-    @patch('cpau.water_meter.requests.get')
-    def test_connection_error_handling(self, mock_requests_get, mock_watersmart_session, mock_credentials):
+    @patch('cpau.water_meter.WatersmartSessionManager')
+    def test_connection_error_handling(self, mock_manager_class, mock_credentials):
         """Test handling of connection errors."""
-        mock_session = MagicMock()
-        mock_watersmart_session.return_value = mock_session
+        _setup_session_manager(
+            mock_manager_class,
+            side_effect=requests.exceptions.ConnectionError(),
+        )
 
-        # Mock connection error
-        import requests
-        mock_requests_get.side_effect = requests.exceptions.ConnectionError()
-
-        meter = CpauWaterMeter(**mock_credentials)
+        meter = CpauWaterMeter(
+            username=mock_credentials['userid'],
+            password=mock_credentials['password']
+        )
 
         with pytest.raises(ConnectionError):
             meter.get_daily_usage(

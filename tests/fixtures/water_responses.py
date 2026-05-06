@@ -3,21 +3,23 @@
 # Mock hourly water usage response (RealTimeChart API)
 HOURLY_USAGE_RESPONSE = {
     "data": {
+        # Timestamps are picked at noon-ish UTC so the local date is
+        # 2023-12-17 in any reasonable timezone, not just UTC.
         "series": [
             {
-                "read_datetime": 1702771200,  # 2023-12-17 00:00:00 UTC
+                "read_datetime": 1702814400,  # 2023-12-17 12:00:00 UTC
                 "gallons": 12.5,
                 "flags": None,
                 "leak_gallons": 0
             },
             {
-                "read_datetime": 1702774800,  # 2023-12-17 01:00:00 UTC
+                "read_datetime": 1702818000,  # 2023-12-17 13:00:00 UTC
                 "gallons": 15.3,
                 "flags": None,
                 "leak_gallons": 0
             },
             {
-                "read_datetime": 1702778400,  # 2023-12-17 02:00:00 UTC
+                "read_datetime": 1702821600,  # 2023-12-17 14:00:00 UTC
                 "gallons": 8.7,
                 "flags": None,
                 "leak_gallons": 0

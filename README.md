@@ -407,6 +407,9 @@ cpau/
 
 ## Changelog
 
+### 1.3.1
+- Fix the unit-test suite for the electric and water meters. The fixtures introduced in 1.0.0 used field names and shapes that didn't match what the code parses, and `test_water_meter.py` patched a name that was never imported, so 21 tests had been silently failing. All 63 tests now pass.
+
 ### 1.3.0
 - Each CLI tool now has a richer `--help` (description + usage examples) using `RawDescriptionHelpFormatter`.
 - Generated man pages for `cpau-electric`, `cpau-water`, and `cpau-availability` ship with the package and install to `share/man/man1`.

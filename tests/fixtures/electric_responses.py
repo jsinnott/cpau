@@ -1,184 +1,133 @@
-"""Mock API responses for electric meter tests."""
+"""Mock API responses for electric meter tests.
+
+The shapes here mirror what the CPAU portal actually returns: the response
+JSON has a single string-typed top-level key 'd' which decodes to the real
+payload. _make_api_request unwraps 'd' before returning, so meter tests
+that mock _make_api_request directly assign the unwrapped payload.
+
+Field names match what session.py and electric_meter.py parse:
+
+  Login response payload:
+    Either {'STATUS': '1', ...} or {'UserID': ..., ...} signals success.
+
+  Meter info payload:
+    {'MeterDetails': [{'MeterNumber', 'MeterType', 'Status', 'Address',
+                       'MeterAttribute2'}, ...]}.
+
+  Usage payload (LoadUsage endpoint):
+    {'objUsageGenerationResultSetTwo': [{...}, ...]}.
+    For daily/hourly/15min: each record has 'UsageDate' (MM/DD/YY),
+    'UsageType' ('IUsage' or 'Eusage'), 'UsageValue', and (for hourly/
+    15min) 'Hourly' (HH:MM).
+    For billing: each record has 'Year', 'Month', 'BillPeriod'
+    (MM/DD/YY to MM/DD/YY), 'UsageType', 'UsageValue'.
+"""
 
 import json
 
-# Mock login page HTML with CSRF token
+
+# HTML returned by the homepage and the Usages page. The two pages use
+# different CSRF inputs, so this fixture carries both names so the same
+# string can stand in for either page in tests:
+#   - "__RequestVerificationToken" is the homepage form's token
+#   - "ctl00$hdnCSRFToken" is the per-page token used by Usages.aspx
 LOGIN_PAGE_HTML = """
 <!DOCTYPE html>
 <html>
 <head><title>CPAU Login</title></head>
 <body>
     <form id="form1">
-        <input type="hidden" name="__VIEWSTATE" value="mock_viewstate_value" />
-        <input type="hidden" name="__EVENTVALIDATION" value="mock_event_validation" />
+        <input type="hidden" name="__RequestVerificationToken" value="mock_csrf_token" />
+        <input type="hidden" name="ctl00$hdnCSRFToken" value="mock_page_csrf_token" />
     </form>
 </body>
 </html>
 """
 
-# Mock successful login response
 LOGIN_SUCCESS_RESPONSE = {
     "d": json.dumps({
-        "UserId": "test@example.com",
-        "Success": True,
+        "STATUS": "1",
+        "UserID": "test@example.com",
         "Message": "Login successful"
     })
 }
 
-# Mock meter information response
 METER_INFO_RESPONSE = {
     "d": json.dumps({
         "MeterDetails": [
             {
                 "MeterNumber": "12345678",
                 "MeterType": "E",
-                "MeterAddress": "123 Test St, Palo Alto, CA",
-                "MeterStatus": 1,
+                "Address": "123 Test St, Palo Alto, CA",
+                "Status": 1,
                 "MeterAttribute2": "E-1 Residential"
             }
         ]
     })
 }
 
-# Mock daily usage response
 DAILY_USAGE_RESPONSE = {
     "d": json.dumps({
-        "UsageData": [
-            {
-                "Date": "12/15/2024",
-                "UsageType": "IUsage",
-                "Usage": "28.06"
-            },
-            {
-                "Date": "12/15/2024",
-                "UsageType": "EUsage",
-                "Usage": "0.10"
-            },
-            {
-                "Date": "12/16/2024",
-                "UsageType": "IUsage",
-                "Usage": "22.25"
-            },
-            {
-                "Date": "12/16/2024",
-                "UsageType": "EUsage",
-                "Usage": "1.43"
-            }
+        "objUsageGenerationResultSetTwo": [
+            {"UsageDate": "12/15/24", "UsageType": "IUsage", "UsageValue": 28.06},
+            {"UsageDate": "12/15/24", "UsageType": "Eusage", "UsageValue": 0.10},
+            {"UsageDate": "12/16/24", "UsageType": "IUsage", "UsageValue": 22.25},
+            {"UsageDate": "12/16/24", "UsageType": "Eusage", "UsageValue": 1.43},
         ]
     })
 }
 
-# Mock hourly usage response (single day)
 HOURLY_USAGE_RESPONSE = {
     "d": json.dumps({
-        "UsageData": [
-            {
-                "Date": "12/17/2024",
-                "Time": "00:00",
-                "UsageType": "IUsage",
-                "Usage": "0.58"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "00:00",
-                "UsageType": "EUsage",
-                "Usage": "0.00"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "01:00",
-                "UsageType": "IUsage",
-                "Usage": "0.64"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "01:00",
-                "UsageType": "EUsage",
-                "Usage": "0.00"
-            }
+        "objUsageGenerationResultSetTwo": [
+            {"UsageDate": "12/17/24", "Hourly": "00:00", "UsageType": "IUsage", "UsageValue": 0.58},
+            {"UsageDate": "12/17/24", "Hourly": "00:00", "UsageType": "Eusage", "UsageValue": 0.00},
+            {"UsageDate": "12/17/24", "Hourly": "01:00", "UsageType": "IUsage", "UsageValue": 0.64},
+            {"UsageDate": "12/17/24", "Hourly": "01:00", "UsageType": "Eusage", "UsageValue": 0.00},
         ]
     })
 }
 
-# Mock 15-minute usage response
 FIFTEEN_MIN_USAGE_RESPONSE = {
     "d": json.dumps({
-        "UsageData": [
-            {
-                "Date": "12/17/2024",
-                "Time": "00:00",
-                "UsageType": "IUsage",
-                "Usage": "0.15"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "00:00",
-                "UsageType": "EUsage",
-                "Usage": "0.00"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "00:15",
-                "UsageType": "IUsage",
-                "Usage": "0.14"
-            },
-            {
-                "Date": "12/17/2024",
-                "Time": "00:15",
-                "UsageType": "EUsage",
-                "Usage": "0.00"
-            }
+        "objUsageGenerationResultSetTwo": [
+            {"UsageDate": "12/17/24", "Hourly": "00:00", "UsageType": "IUsage", "UsageValue": 0.15},
+            {"UsageDate": "12/17/24", "Hourly": "00:00", "UsageType": "Eusage", "UsageValue": 0.00},
+            {"UsageDate": "12/17/24", "Hourly": "00:15", "UsageType": "IUsage", "UsageValue": 0.14},
+            {"UsageDate": "12/17/24", "Hourly": "00:15", "UsageType": "Eusage", "UsageValue": 0.00},
         ]
     })
 }
 
-# Mock billing period response
 BILLING_USAGE_RESPONSE = {
     "d": json.dumps({
-        "UsageData": [
+        "objUsageGenerationResultSetTwo": [
             {
-                "BillingPeriod": "11/01/2024 - 11/30/2024",
-                "BillingPeriodStart": "11/01/2024",
-                "BillingPeriodEnd": "11/30/2024",
-                "UsageType": "IUsage",
-                "Usage": "689.4"
+                "Year": 2024, "Month": 11,
+                "BillPeriod": "11/01/24 to 11/30/24",
+                "UsageType": "IUsage", "UsageValue": 689.4,
             },
             {
-                "BillingPeriod": "11/01/2024 - 11/30/2024",
-                "BillingPeriodStart": "11/01/2024",
-                "BillingPeriodEnd": "11/30/2024",
-                "UsageType": "EUsage",
-                "Usage": "156.2"
+                "Year": 2024, "Month": 11,
+                "BillPeriod": "11/01/24 to 11/30/24",
+                "UsageType": "Eusage", "UsageValue": 156.2,
             },
             {
-                "BillingPeriod": "12/01/2024 - 12/31/2024",
-                "BillingPeriodStart": "12/01/2024",
-                "BillingPeriodEnd": "12/31/2024",
-                "UsageType": "IUsage",
-                "Usage": "712.5"
+                "Year": 2024, "Month": 12,
+                "BillPeriod": "12/01/24 to 12/31/24",
+                "UsageType": "IUsage", "UsageValue": 712.5,
             },
             {
-                "BillingPeriod": "12/01/2024 - 12/31/2024",
-                "BillingPeriodStart": "12/01/2024",
-                "BillingPeriodEnd": "12/31/2024",
-                "UsageType": "EUsage",
-                "Usage": "168.3"
-            }
+                "Year": 2024, "Month": 12,
+                "BillPeriod": "12/01/24 to 12/31/24",
+                "UsageType": "Eusage", "UsageValue": 168.3,
+            },
         ]
     })
 }
 
-# Mock empty response (no data)
 EMPTY_USAGE_RESPONSE = {
     "d": json.dumps({
-        "UsageData": []
-    })
-}
-
-# Mock error response
-ERROR_RESPONSE = {
-    "d": json.dumps({
-        "Error": "Invalid request",
-        "Success": False
+        "objUsageGenerationResultSetTwo": []
     })
 }
