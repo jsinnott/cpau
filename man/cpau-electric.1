@@ -1,0 +1,56 @@
+.TH CPAU\-ELECTRIC "1" "2026\-05\-06" "cpau" "Generated Python Manual"
+.SH NAME
+cpau\-electric
+.SH SYNOPSIS
+.B cpau\-electric
+[-h] [--version] [-s | -v] [--secrets-file SECRETS_FILE] [-i {billing,monthly,daily,hourly,15min}] [-o OUTPUT_FILE] start_date [end_date]
+.SH DESCRIPTION
+Download electric meter usage data from the City of Palo Alto Utilities customer portal. Authenticates via the credentials file (default: ~/.cpau/secrets.json) and emits CSV. Supported intervals are billing, monthly, daily, hourly, and 15min; the billing interval emits extra columns describing each billing period. If end_date is omitted it defaults to two days ago, since CPAU's data is usually current to that point.
+
+.TP
+\fBstart_date\fR
+Start date for data retrieval in YYYY\-MM\-DD format (e.g., 2025\-12\-01)
+
+.TP
+\fBend_date\fR
+End date for data retrieval in YYYY\-MM\-DD format (default: 2 days ago)
+
+.SH OPTIONS
+.TP
+\fB\-\-version\fR
+show program's version number and exit
+
+.TP
+\fB\-s\fR, \fB\-\-silent\fR
+supress non\-error logging
+
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+log debug\-level processing information
+
+.TP
+\fB\-\-secrets\-file\fR \fI\,SECRETS_FILE\/\fR
+Path to JSON file with 'userid' and 'password' fields (default: $CPAU_SECRETS_FILE or ~/.cpau/secrets.json)
+
+.TP
+\fB\-i\fR \fI\,{billing,monthly,daily,hourly,15min}\/\fR, \fB\-\-interval\fR \fI\,{billing,monthly,daily,hourly,15min}\/\fR
+Time interval for data retrieval (default: billing)
+
+.TP
+\fB\-o\fR \fI\,OUTPUT_FILE\/\fR, \fB\-\-output\-file\fR \fI\,OUTPUT_FILE\/\fR
+Path to output file (default: stdout)
+
+.SH COMMENTS
+examples:
+  cpau\-electric \-\-interval daily 2025\-01\-01 2025\-01\-31
+  cpau\-electric \-\-interval hourly 2025\-01\-01 > electric_hourly.csv
+  cpau\-electric \-\-interval billing 2024\-01\-01 2024\-12\-31 \-o billing.csv
+  CPAU_SECRETS_FILE=~/work/cpau\-secrets.json cpau\-electric \-i daily 2025\-01\-01
+
+.SH AUTHOR
+.nf
+Joe Sinnott <joe@jsinnott.net>
+.fi
+.nf
+Claude <noreply@anthropic.com>
+.fi

@@ -392,7 +392,10 @@ cpau/
 │   └── water/             # Scripts for reverse-engineering water API
 │
 ├── tools/                 # Maintenance scripts
-│   └── sync_baseapp.sh    # Refresh src/cpau/baseapp.py from jsinnott_utils
+│   ├── sync_baseapp.sh    # Refresh src/cpau/baseapp.py from jsinnott_utils
+│   └── generate_manpages.sh  # Regenerate man/*.1 from argparse definitions
+│
+├── man/                   # Generated man pages (checked in)
 │
 ├── pyproject.toml         # Package configuration
 ├── README.md              # This file
@@ -403,6 +406,11 @@ cpau/
 `src/cpau/baseapp.py` is vendored from a private utility package (`jsinnott_utils`) and refreshed via `tools/sync_baseapp.sh`. Don't edit the vendored copy directly.
 
 ## Changelog
+
+### 1.3.0
+- Each CLI tool now has a richer `--help` (description + usage examples) using `RawDescriptionHelpFormatter`.
+- Generated man pages for `cpau-electric`, `cpau-water`, and `cpau-availability` ship with the package and install to `share/man/man1`.
+- New `tools/generate_manpages.sh` regenerates the man pages from the argparse definitions; `argparse-manpage` added as a dev dependency.
 
 ### 1.2.0
 - Credentials now load from `~/.cpau/secrets.json` by default (was: `./secrets.json` in the current working directory). Use `--secrets-file <path>` or `CPAU_SECRETS_FILE` to override.

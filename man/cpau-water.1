@@ -1,0 +1,59 @@
+.TH CPAU\-WATER "1" "2026\-05\-06" "cpau" "Generated Python Manual"
+.SH NAME
+cpau\-water
+.SH SYNOPSIS
+.B cpau\-water
+[-h] [--version] [-s | -v] [--secrets-file SECRETS_FILE] [-i {billing,monthly,daily,hourly}] [-o OUTPUT_FILE] [--cache-dir CACHE_DIR] start_date [end_date]
+.SH DESCRIPTION
+Download water meter usage data from the City of Palo Alto WaterSmart portal. Authenticates via SAML/SSO using the credentials file (default: ~/.cpau/secrets.json) and emits CSV. The first invocation runs a headless browser to obtain a session cookie; subsequent invocations reuse the cached cookie from \-\-cache\-dir for fast (~1 second) authentication. Supported intervals are billing, monthly, daily, and hourly. The output column 'gallons' carries the usage value (water meters do not report kWh).
+
+.TP
+\fBstart_date\fR
+Start date for data retrieval in YYYY\-MM\-DD format (e.g., 2024\-12\-01)
+
+.TP
+\fBend_date\fR
+End date for data retrieval in YYYY\-MM\-DD format (default: today)
+
+.SH OPTIONS
+.TP
+\fB\-\-version\fR
+show program's version number and exit
+
+.TP
+\fB\-s\fR, \fB\-\-silent\fR
+supress non\-error logging
+
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+log debug\-level processing information
+
+.TP
+\fB\-\-secrets\-file\fR \fI\,SECRETS_FILE\/\fR
+Path to JSON file with 'userid' and 'password' fields (default: $CPAU_SECRETS_FILE or ~/.cpau/secrets.json)
+
+.TP
+\fB\-i\fR \fI\,{billing,monthly,daily,hourly}\/\fR, \fB\-\-interval\fR \fI\,{billing,monthly,daily,hourly}\/\fR
+Time interval for data retrieval (default: billing)
+
+.TP
+\fB\-o\fR \fI\,OUTPUT_FILE\/\fR, \fB\-\-output\-file\fR \fI\,OUTPUT_FILE\/\fR
+Path to output file (default: stdout)
+
+.TP
+\fB\-\-cache\-dir\fR \fI\,CACHE_DIR\/\fR
+Directory for caching authentication cookies (default: ~/.cpau)
+
+.SH COMMENTS
+examples:
+  cpau\-water \-\-interval daily 2025\-01\-01 2025\-01\-31
+  cpau\-water \-\-interval hourly 2025\-01\-01 > water_hourly.csv
+  cpau\-water \-\-interval billing 2024\-01\-01 2024\-12\-31 \-o billing.csv
+
+.SH AUTHOR
+.nf
+Joe Sinnott <joe@jsinnott.net>
+.fi
+.nf
+Claude <noreply@anthropic.com>
+.fi

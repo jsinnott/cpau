@@ -109,8 +109,23 @@ class CpauApp(BaseApp):
 
     Subclasses should override ``add_arg_definitions`` (calling
     ``super()`` first) to add their own arguments, and ``go()`` to do
-    their own work after calling ``super().go(argv)``.
+    their own work after calling ``super().go(argv)``. Subclasses are
+    also expected to set ``DESCRIPTION`` and ``EPILOG`` class attributes
+    to enrich ``--help`` output and feed the man-page generator.
     """
+
+    def parse_args(self, argv: list) -> argparse.Namespace:
+        # Use the class's DESCRIPTION/EPILOG with a formatter that
+        # preserves the EPILOG examples' line breaks. This mirrors
+        # what BaseApp.build_parser() does, so --help and the generated
+        # man page stay in sync.
+        parser = argparse.ArgumentParser(
+            description=getattr(type(self), 'DESCRIPTION', None),
+            epilog=getattr(type(self), 'EPILOG', None),
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        self.add_arg_definitions(parser)
+        return parser.parse_args(argv)
 
     def add_arg_definitions(self, parser: argparse.ArgumentParser) -> None:
         super().add_arg_definitions(parser)
@@ -120,7 +135,7 @@ class CpauApp(BaseApp):
             default=None,
             help=(
                 f"Path to JSON file with 'userid' and 'password' fields "
-                f"(default: ${SECRETS_FILE_ENV_VAR} or {DEFAULT_SECRETS_PATH})"
+                f"(default: ${SECRETS_FILE_ENV_VAR} or ~/.cpau/secrets.json)"
             ),
         )
 

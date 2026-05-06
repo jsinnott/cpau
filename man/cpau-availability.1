@@ -1,0 +1,47 @@
+.TH CPAU\-AVAILABILITY "1" "2026\-05\-06" "cpau" "Generated Python Manual"
+.SH NAME
+cpau\-availability
+.SH SYNOPSIS
+.B cpau\-availability
+[-h] [--version] [-s | -v] [--secrets-file SECRETS_FILE] [--cache-dir CACHE_DIR] [-o OUTPUT_FILE]
+.SH DESCRIPTION
+Report which intervals (billing, monthly, daily, hourly, 15min) have data and what date range each spans, for both the electric and water meters on the account. Useful for discovering how far back history reaches before requesting bulk downloads. Output is CSV with columns data_type, interval, data_start, data_end.
+
+.SH OPTIONS
+.TP
+\fB\-\-version\fR
+show program's version number and exit
+
+.TP
+\fB\-s\fR, \fB\-\-silent\fR
+supress non\-error logging
+
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+log debug\-level processing information
+
+.TP
+\fB\-\-secrets\-file\fR \fI\,SECRETS_FILE\/\fR
+Path to JSON file with 'userid' and 'password' fields (default: $CPAU_SECRETS_FILE or ~/.cpau/secrets.json)
+
+.TP
+\fB\-\-cache\-dir\fR \fI\,CACHE_DIR\/\fR
+Directory for caching water meter authentication cookies (default: ~/.cpau)
+
+.TP
+\fB\-o\fR \fI\,OUTPUT_FILE\/\fR, \fB\-\-output\-file\fR \fI\,OUTPUT_FILE\/\fR
+Path to output file (default: stdout)
+
+.SH COMMENTS
+examples:
+  cpau\-availability
+  cpau\-availability \-o availability.csv
+  cpau\-availability \-\-secrets\-file ~/work/cpau\-secrets.json
+
+.SH AUTHOR
+.nf
+Joe Sinnott <joe@jsinnott.net>
+.fi
+.nf
+Claude <noreply@anthropic.com>
+.fi

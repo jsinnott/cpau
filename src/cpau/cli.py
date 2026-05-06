@@ -25,6 +25,24 @@ from .water_meter import CpauWaterMeter
 class CpauElectricCli(CpauApp):
     """Command-line application for downloading CPAU electric meter data."""
 
+    DESCRIPTION = (
+        "Download electric meter usage data from the City of Palo Alto "
+        "Utilities customer portal. Authenticates via the credentials "
+        "file (default: ~/.cpau/secrets.json) and emits CSV. Supported "
+        "intervals are billing, monthly, daily, hourly, and 15min; the "
+        "billing interval emits extra columns describing each billing "
+        "period. If end_date is omitted it defaults to two days ago, "
+        "since CPAU's data is usually current to that point."
+    )
+
+    EPILOG = (
+        "examples:\n"
+        "  cpau-electric --interval daily 2025-01-01 2025-01-31\n"
+        "  cpau-electric --interval hourly 2025-01-01 > electric_hourly.csv\n"
+        "  cpau-electric --interval billing 2024-01-01 2024-12-31 -o billing.csv\n"
+        "  CPAU_SECRETS_FILE=~/work/cpau-secrets.json cpau-electric -i daily 2025-01-01\n"
+    )
+
     def add_arg_definitions(self, parser: ArgumentParser) -> None:
         super().add_arg_definitions(parser)
 
@@ -145,6 +163,11 @@ class CpauElectricCli(CpauApp):
             return 1
 
 
+def build_parser_electric():
+    """Module-level entry point for argparse-manpage."""
+    return CpauElectricCli.build_parser()
+
+
 def main_electric():
     """Entry point for cpau-electric command."""
     app = CpauElectricCli()
@@ -153,6 +176,25 @@ def main_electric():
 
 class CpauWaterCli(CpauApp):
     """Command-line application for downloading CPAU water meter data."""
+
+    DESCRIPTION = (
+        "Download water meter usage data from the City of Palo Alto "
+        "WaterSmart portal. Authenticates via SAML/SSO using the "
+        "credentials file (default: ~/.cpau/secrets.json) and emits CSV. "
+        "The first invocation runs a headless browser to obtain a session "
+        "cookie; subsequent invocations reuse the cached cookie from "
+        "--cache-dir for fast (~1 second) authentication. Supported "
+        "intervals are billing, monthly, daily, and hourly. The output "
+        "column 'gallons' carries the usage value (water meters do not "
+        "report kWh)."
+    )
+
+    EPILOG = (
+        "examples:\n"
+        "  cpau-water --interval daily 2025-01-01 2025-01-31\n"
+        "  cpau-water --interval hourly 2025-01-01 > water_hourly.csv\n"
+        "  cpau-water --interval billing 2024-01-01 2024-12-31 -o billing.csv\n"
+    )
 
     def add_arg_definitions(self, parser: ArgumentParser) -> None:
         super().add_arg_definitions(parser)
@@ -279,6 +321,11 @@ class CpauWaterCli(CpauApp):
             return 1
 
 
+def build_parser_water():
+    """Module-level entry point for argparse-manpage."""
+    return CpauWaterCli.build_parser()
+
+
 def main_water():
     """Entry point for cpau-water command."""
     app = CpauWaterCli()
@@ -287,6 +334,21 @@ def main_water():
 
 class CpauAvailabilityCli(CpauApp):
     """Command-line application for checking CPAU data availability."""
+
+    DESCRIPTION = (
+        "Report which intervals (billing, monthly, daily, hourly, 15min) "
+        "have data and what date range each spans, for both the electric "
+        "and water meters on the account. Useful for discovering how far "
+        "back history reaches before requesting bulk downloads. Output is "
+        "CSV with columns data_type, interval, data_start, data_end."
+    )
+
+    EPILOG = (
+        "examples:\n"
+        "  cpau-availability\n"
+        "  cpau-availability -o availability.csv\n"
+        "  cpau-availability --secrets-file ~/work/cpau-secrets.json\n"
+    )
 
     def add_arg_definitions(self, parser: ArgumentParser) -> None:
         super().add_arg_definitions(parser)
@@ -405,6 +467,11 @@ class CpauAvailabilityCli(CpauApp):
         except Exception as e:
             self.logger.error(f"Failed to write output: {e}")
             return 1
+
+
+def build_parser_availability():
+    """Module-level entry point for argparse-manpage."""
+    return CpauAvailabilityCli.build_parser()
 
 
 def main_availability():
