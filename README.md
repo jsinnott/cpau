@@ -59,16 +59,22 @@ playwright install chromium  # For water meter support
 
 ### 1. Set Up Credentials
 
-Create a `secrets.json` file with your CPAU login credentials:
+Create `~/.cpau/secrets.json` with your CPAU login credentials:
 
-```json
+```bash
+mkdir -p ~/.cpau
+cat > ~/.cpau/secrets.json <<'EOF'
 {
     "userid": "your_email@example.com",
     "password": "your_password"
 }
+EOF
+chmod 600 ~/.cpau/secrets.json
 ```
 
-⚠️ **Important**: Never commit this file to version control. It's already in `.gitignore`.
+The CLI tools read this file by default. You can override the location with `--secrets-file <path>` or by setting the `CPAU_SECRETS_FILE` environment variable.
+
+⚠️ **Important**: Never commit this file to version control.
 
 ### 2. Use the CLI
 
@@ -367,13 +373,14 @@ cpau-water -v --interval daily 2024-12-01 > output.csv
 cpau/
 ├── src/cpau/              # Main library package
 │   ├── __init__.py        # Public API exports
+│   ├── app.py             # CpauApp base class + load_credentials()
+│   ├── baseapp.py         # Vendored BaseApp from jsinnott_utils
 │   ├── cli.py             # Command-line interfaces
 │   ├── session.py         # Electric meter session
 │   ├── electric_meter.py  # Electric meter API
 │   ├── water_meter.py     # Water meter API
 │   ├── watersmart_session.py  # SAML/SSO authentication
 │   ├── meter.py           # Base meter classes
-│   ├── baseapp.py         # CLI application framework
 │   └── exceptions.py      # Custom exceptions
 │
 ├── docs/                  # Documentation
@@ -396,6 +403,11 @@ cpau/
 `src/cpau/baseapp.py` is vendored from a private utility package (`jsinnott_utils`) and refreshed via `tools/sync_baseapp.sh`. Don't edit the vendored copy directly.
 
 ## Changelog
+
+### 1.2.0
+- Credentials now load from `~/.cpau/secrets.json` by default (was: `./secrets.json` in the current working directory). Use `--secrets-file <path>` or `CPAU_SECRETS_FILE` to override.
+- New `cpau.app` module: `CpauCredentials` dataclass, `load_credentials()` helper, and a `CpauApp` base class shared by the three CLI tools.
+- **Migration**: existing users should `mkdir -p ~/.cpau && mv secrets.json ~/.cpau/secrets.json`, or keep passing `--secrets-file ./secrets.json`.
 
 ### 1.1.0
 - Refresh vendored `BaseApp` from `jsinnott_utils` v1.3.0; `--version` flag now available on every CLI tool.
