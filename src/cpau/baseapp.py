@@ -1,6 +1,12 @@
+# This file is vendored from jsinnott_utils v1.3.0.
+# Do NOT edit it here — run tools/sync_baseapp.sh to refresh.
+#
+# Source: /Users/jsinnott/code/python-utils/src/jsinnott_utils/baseapp.py
+
 from abc import ABC, abstractmethod
 import argparse
 from argparse import ArgumentParser, Namespace
+from importlib.metadata import version, PackageNotFoundError
 import json
 import logging
 from math import e
@@ -13,12 +19,49 @@ import coloredlogs
 
 class BaseApp(ABC):
 
+    def get_version(self) -> str:
+        """Get version of the package containing the subclass."""
+        module_name = self.__class__.__module__
+
+        # When running as __main__, get the actual module name from __spec__
+        if module_name == '__main__':
+            main_module = sys.modules.get('__main__')
+            if main_module and hasattr(main_module, '__spec__') and main_module.__spec__:
+                module_name = main_module.__spec__.name
+
+        package = module_name.split('.')[0]
+        try:
+            return version(package)
+        except PackageNotFoundError:
+            return "unknown"
+
+    @classmethod
+    def build_parser(cls):
+        """Build and return the ArgumentParser without running the app.
+
+        Creates an instance of the class, constructs an ArgumentParser
+        (using DESCRIPTION and EPILOG class attributes if defined), and
+        populates it via add_arg_definitions. Useful for man page generation
+        with tools like argparse-manpage.
+        """
+        instance = cls()
+        parser = argparse.ArgumentParser(
+            description=getattr(cls, 'DESCRIPTION', None),
+            epilog=getattr(cls, 'EPILOG', None),
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        instance.add_arg_definitions(parser)
+        return parser
+
     def parse_args(self, argv: list) -> Namespace:
-        parser = argparse.ArgumentParser()        
+        parser = argparse.ArgumentParser()
         self.add_arg_definitions(parser)
         return parser.parse_args(argv)
 
     def add_arg_definitions(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument('--version',
+                            action='version',
+                            version=f'%(prog)s {self.get_version()}')
         group = parser.add_mutually_exclusive_group(required=False)
         group.add_argument("-s",
                             "--silent",

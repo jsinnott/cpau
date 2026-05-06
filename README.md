@@ -1,7 +1,7 @@
 # CPAU - City of Palo Alto Utilities Data Access
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Documentation Status](https://readthedocs.org/projects/cpau/badge/?version=latest)](https://cpau.readthedocs.io/en/latest/?badge=latest)
 
 A Python library and CLI tools for downloading electric and water meter data from the City of Palo Alto Utilities (CPAU) customer portal.
@@ -384,11 +384,27 @@ cpau/
 │   ├── electric/          # Scripts for reverse-engineering electric API
 │   └── water/             # Scripts for reverse-engineering water API
 │
+├── tools/                 # Maintenance scripts
+│   └── sync_baseapp.sh    # Refresh src/cpau/baseapp.py from jsinnott_utils
+│
 ├── pyproject.toml         # Package configuration
 ├── README.md              # This file
 ├── LICENSE                # MIT License
 └── .gitignore             # Git ignore rules
 ```
+
+`src/cpau/baseapp.py` is vendored from a private utility package (`jsinnott_utils`) and refreshed via `tools/sync_baseapp.sh`. Don't edit the vendored copy directly.
+
+## Changelog
+
+### 1.1.0
+- Refresh vendored `BaseApp` from `jsinnott_utils` v1.3.0; `--version` flag now available on every CLI tool.
+- Move virtual environment from project root to `venv/` to match standard layout.
+- Drop redundant `requirements.txt` (use `pyproject.toml`).
+- Bump minimum Python to 3.10.
+
+### 1.0.0
+- Initial public release with `cpau-electric`, `cpau-water`, and `cpau-availability` CLIs and a Python API.
 
 ## Development
 

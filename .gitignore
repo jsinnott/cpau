@@ -34,12 +34,6 @@ venv/
 env/
 ENV/
 .venv
-bin/
-include/
-lib/
-lib64/
-pyvenv.cfg
-share/
 
 # IDE
 .vscode/
