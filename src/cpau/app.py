@@ -15,11 +15,13 @@ Provides:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from .baseapp import BaseApp
 
@@ -146,4 +148,31 @@ class CpauApp(BaseApp):
         except CredentialsError as e:
             self.logger.error(str(e))
             return 1
+        return 0
+
+    def write_csv(self, rows: Sequence[dict], fieldnames: list[str]) -> int:
+        """Write CSV rows to ``self.args.output_file`` or stdout.
+
+        Subclasses parse ``--output-file`` themselves; this helper centralizes
+        the open-and-write dance and the file-write error handling so that
+        every cpau-* CLI reports failures the same way. Stdout writes are
+        deliberately not wrapped in a try/except — a broken pipe should
+        propagate normally.
+
+        Returns 0 on success, 1 on file-write failure.
+        """
+        if self.args.output_file:
+            try:
+                with open(self.args.output_file, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                    writer.writeheader()
+                    writer.writerows(rows)
+                self.logger.info(f"Wrote {len(rows)} records to {self.args.output_file}")
+            except Exception as e:
+                self.logger.error(f"Failed to write output file: {e}")
+                return 1
+        else:
+            writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(rows)
         return 0

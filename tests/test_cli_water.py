@@ -422,6 +422,63 @@ class TestCpauWaterCli:
             Path(secrets_file).unlink()
 
     @patch('cpau.cli.CpauWaterMeter')
+    def test_defaulted_end_date_before_start_emits_empty(self, mock_meter_class, mock_credentials):
+        """When end_date is defaulted (today) and falls before start_date,
+        emit header-only CSV with exit 0 instead of erroring. Callers
+        running incremental fetches need this to behave gracefully on
+        no-news days.
+        """
+        secrets_file = self.create_temp_secrets(mock_credentials)
+
+        try:
+            mock_meter = MagicMock()
+            mock_meter_class.return_value = mock_meter
+
+            cli = CpauWaterCli()
+            with patch('sys.stdout', new=StringIO()) as fake_out:
+                exit_code = cli.go([
+                    '--interval', 'daily',
+                    '--secrets-file', secrets_file,
+                    '9999-12-31'  # Way past today
+                ])
+
+                assert exit_code == 0
+                # Meter should never have been contacted at all
+                assert not mock_meter.get_usage.called
+                output = fake_out.getvalue().splitlines()
+                assert output == ['date,gallons']
+
+        finally:
+            Path(secrets_file).unlink()
+
+    @patch('cpau.cli.CpauWaterMeter')
+    def test_explicit_inverted_range_still_errors(self, mock_meter_class, mock_credentials):
+        """User-supplied inverted ranges must still error — only the
+        defaulted-empty case is treated gracefully.
+        """
+        secrets_file = self.create_temp_secrets(mock_credentials)
+
+        try:
+            mock_meter = MagicMock()
+            mock_meter.get_usage.side_effect = ValueError(
+                "end_date (2024-01-01) must be >= start_date (2024-12-31)"
+            )
+            mock_meter_class.return_value = mock_meter
+
+            cli = CpauWaterCli()
+            with patch('sys.stdout', new=StringIO()):
+                exit_code = cli.go([
+                    '--interval', 'daily',
+                    '--secrets-file', secrets_file,
+                    '2024-12-31',
+                    '2024-01-01'  # Explicitly inverted
+                ])
+                assert exit_code == 1
+
+        finally:
+            Path(secrets_file).unlink()
+
+    @patch('cpau.cli.CpauWaterMeter')
     def test_silent_flag(self, mock_meter_class, mock_credentials):
         """Test silent flag suppresses log output."""
         secrets_file = self.create_temp_secrets(mock_credentials)

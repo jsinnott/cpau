@@ -5,7 +5,7 @@ cpau\-water
 .B cpau\-water
 [-h] [--version] [-s | -v] [--secrets-file SECRETS_FILE] [-i {billing,monthly,daily,hourly}] [-o OUTPUT_FILE] [--cache-dir CACHE_DIR] start_date [end_date]
 .SH DESCRIPTION
-Download water meter usage data from the City of Palo Alto WaterSmart portal. Authenticates via SAML/SSO using the credentials file (default: ~/.cpau/secrets.json) and emits CSV. The first invocation runs a headless browser to obtain a session cookie; subsequent invocations reuse the cached cookie from \-\-cache\-dir for fast (~1 second) authentication. Supported intervals are billing, monthly, daily, and hourly. The output column 'gallons' carries the usage value (water meters do not report kWh).
+Download water meter usage data from the City of Palo Alto WaterSmart portal. Authenticates via SAML/SSO using the credentials file (default: ~/.cpau/secrets.json) and emits CSV. The first invocation runs a headless browser to obtain a session cookie; subsequent invocations reuse the cached cookie from \-\-cache\-dir for fast (~1 second) authentication. Supported intervals are billing, monthly, daily, and hourly. The output column 'gallons' carries the usage value (water meters do not report kWh). If end_date is omitted it defaults to today; when start_date is later than today, an empty CSV is emitted (header only, exit 0) rather than treating the synthesized inverted range as an error.
 
 .TP
 \fBstart_date\fR

@@ -380,3 +380,70 @@ class TestCpauElectricCli:
 
         finally:
             Path(secrets_file).unlink()
+
+    @patch('cpau.cli.CpauApiSession')
+    def test_defaulted_end_date_before_start_emits_empty(self, mock_session_class, mock_credentials):
+        """When end_date is defaulted and falls before start_date, emit
+        header-only CSV with exit 0 instead of erroring. This is the common
+        no-news case for callers that increment start_date past CPAU's
+        2-day-trailing data boundary on a daily incremental fetch.
+        """
+        secrets_file = self.create_temp_secrets(mock_credentials)
+
+        try:
+            mock_session = MagicMock()
+            mock_meter = MagicMock()
+            mock_session.__enter__.return_value = mock_session
+            mock_session.__exit__.return_value = None
+            mock_session.get_electric_meter.return_value = mock_meter
+            mock_session_class.return_value = mock_session
+
+            cli = CpauElectricCli()
+            with patch('sys.stdout', new=StringIO()) as fake_out:
+                exit_code = cli.go([
+                    '--interval', 'daily',
+                    '--secrets-file', secrets_file,
+                    '9999-12-31'  # Way past any defaulted end_date
+                ])
+
+                assert exit_code == 0
+                # Meter should never have been contacted at all
+                assert not mock_meter.get_usage.called
+                output = fake_out.getvalue().splitlines()
+                # Header only, no data rows
+                assert output == ['date,export_kwh,import_kwh,net_kwh']
+
+        finally:
+            Path(secrets_file).unlink()
+
+    @patch('cpau.cli.CpauApiSession')
+    def test_explicit_inverted_range_still_errors(self, mock_session_class, mock_credentials):
+        """When end_date is explicitly supplied and inverted, the meter-layer
+        validator must still reject it. Defaulted-empty is graceful;
+        user-error is not.
+        """
+        secrets_file = self.create_temp_secrets(mock_credentials)
+
+        try:
+            mock_session = MagicMock()
+            mock_meter = MagicMock()
+            mock_meter.get_usage.side_effect = ValueError(
+                "end_date (2024-01-01) must be >= start_date (2024-12-31)"
+            )
+            mock_session.__enter__.return_value = mock_session
+            mock_session.__exit__.return_value = None
+            mock_session.get_electric_meter.return_value = mock_meter
+            mock_session_class.return_value = mock_session
+
+            cli = CpauElectricCli()
+            with patch('sys.stdout', new=StringIO()):
+                exit_code = cli.go([
+                    '--interval', 'daily',
+                    '--secrets-file', secrets_file,
+                    '2024-12-31',
+                    '2024-01-01'  # Explicitly inverted
+                ])
+                assert exit_code == 1
+
+        finally:
+            Path(secrets_file).unlink()

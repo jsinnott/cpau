@@ -32,7 +32,11 @@ class CpauElectricCli(CpauApp):
         "intervals are billing, monthly, daily, hourly, and 15min; the "
         "billing interval emits extra columns describing each billing "
         "period. If end_date is omitted it defaults to two days ago, "
-        "since CPAU's data is usually current to that point."
+        "since CPAU's data is usually current to that point. When "
+        "start_date is later than that default (e.g., during incremental "
+        "fetches that have caught up to CPAU's trailing edge), an empty "
+        "CSV is emitted (header only, exit 0) rather than treating the "
+        "synthesized inverted range as an error."
     )
 
     EPILOG = (
@@ -88,14 +92,35 @@ class CpauElectricCli(CpauApp):
             self.logger.error(f"Invalid start date format: {self.args.start_date} (expected YYYY-MM-DD)")
             return 1
 
-        if self.args.end_date:
+        end_date_was_defaulted = self.args.end_date is None
+        if end_date_was_defaulted:
+            end_date_obj = date.today() - timedelta(days=2)
+        else:
             try:
                 end_date_obj = date.fromisoformat(self.args.end_date)
             except ValueError:
                 self.logger.error(f"Invalid end date format: {self.args.end_date} (expected YYYY-MM-DD)")
                 return 1
+
+        if self.args.interval == 'billing':
+            fieldnames = ['date', 'billing_period_start', 'billing_period_end', 'billing_period_length', 'export_kwh', 'import_kwh', 'net_kwh']
         else:
-            end_date_obj = date.today() - timedelta(days=2)
+            fieldnames = ['date', 'export_kwh', 'import_kwh', 'net_kwh']
+
+        # When end_date was *defaulted* to ~2 days ago and the caller's
+        # start_date is past that point, CPAU has no new data yet. Treat
+        # this as an empty result (header-only CSV, exit 0) so callers
+        # running incremental "fetch since max(date)" loops don't fail on
+        # no-news days. A user-supplied inverted range still errors at the
+        # meter layer below; that's intentional — explicit user error
+        # deserves an explicit failure.
+        if end_date_was_defaulted and end_date_obj < start_date_obj:
+            self.logger.info(
+                f"No new data available: default end_date ({end_date_obj}) "
+                f"precedes start_date ({start_date_obj}). CPAU data typically "
+                f"trails the current date by ~2 days."
+            )
+            return self.write_csv([], fieldnames)
 
         try:
             self.logger.info("Connecting to CPAU portal")
@@ -116,11 +141,6 @@ class CpauElectricCli(CpauApp):
 
                 self.logger.info(f"Retrieved {len(usage_records)} records")
 
-                if self.args.interval == 'billing':
-                    fieldnames = ['date', 'billing_period_start', 'billing_period_end', 'billing_period_length', 'export_kwh', 'import_kwh', 'net_kwh']
-                else:
-                    fieldnames = ['date', 'export_kwh', 'import_kwh', 'net_kwh']
-
                 rows = []
                 for record in usage_records:
                     row = {
@@ -135,22 +155,7 @@ class CpauElectricCli(CpauApp):
                         row['billing_period_length'] = record.billing_period_length
                     rows.append(row)
 
-                if self.args.output_file:
-                    try:
-                        with open(self.args.output_file, 'w', newline='') as f:
-                            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                            writer.writeheader()
-                            writer.writerows(rows)
-                        self.logger.info(f"Wrote {len(rows)} records to {self.args.output_file}")
-                    except Exception as e:
-                        self.logger.error(f"Failed to write output file: {e}")
-                        return 1
-                else:
-                    writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, extrasaction='ignore')
-                    writer.writeheader()
-                    writer.writerows(rows)
-
-                return 0
+                return self.write_csv(rows, fieldnames)
 
         except CpauError as e:
             self.logger.error(f"CPAU API error: {e}")
@@ -186,7 +191,10 @@ class CpauWaterCli(CpauApp):
         "--cache-dir for fast (~1 second) authentication. Supported "
         "intervals are billing, monthly, daily, and hourly. The output "
         "column 'gallons' carries the usage value (water meters do not "
-        "report kWh)."
+        "report kWh). If end_date is omitted it defaults to today; when "
+        "start_date is later than today, an empty CSV is emitted (header "
+        "only, exit 0) rather than treating the synthesized inverted "
+        "range as an error."
     )
 
     EPILOG = (
@@ -248,14 +256,35 @@ class CpauWaterCli(CpauApp):
             self.logger.error(f"Invalid start date format: {self.args.start_date} (expected YYYY-MM-DD)")
             return 1
 
-        if self.args.end_date:
+        end_date_was_defaulted = self.args.end_date is None
+        if end_date_was_defaulted:
+            end_date_obj = date.today()
+        else:
             try:
                 end_date_obj = date.fromisoformat(self.args.end_date)
             except ValueError:
                 self.logger.error(f"Invalid end date format: {self.args.end_date} (expected YYYY-MM-DD)")
                 return 1
+
+        # For water meter, import_kwh contains gallons (not kWh).
+        if self.args.interval == 'billing':
+            fieldnames = ['date', 'billing_period_start', 'billing_period_end', 'billing_period_length', 'gallons']
         else:
-            end_date_obj = date.today()
+            fieldnames = ['date', 'gallons']
+
+        # When end_date was *defaulted* to today and the caller's
+        # start_date is past that point, no new data is available yet.
+        # Treat this as an empty result (header-only CSV, exit 0) so
+        # callers running incremental "fetch since max(date)" loops don't
+        # fail on no-news days. A user-supplied inverted range still
+        # errors at the meter layer below; that's intentional — explicit
+        # user error deserves an explicit failure.
+        if end_date_was_defaulted and end_date_obj < start_date_obj:
+            self.logger.info(
+                f"No new data available: default end_date ({end_date_obj}, today) "
+                f"precedes start_date ({start_date_obj})."
+            )
+            return self.write_csv([], fieldnames)
 
         try:
             self.logger.info("Initializing water meter connection")
@@ -275,12 +304,6 @@ class CpauWaterCli(CpauApp):
 
             self.logger.info(f"Retrieved {len(usage_records)} records")
 
-            # For water meter, import_kwh contains gallons (not kWh).
-            if self.args.interval == 'billing':
-                fieldnames = ['date', 'billing_period_start', 'billing_period_end', 'billing_period_length', 'gallons']
-            else:
-                fieldnames = ['date', 'gallons']
-
             rows = []
             for record in usage_records:
                 row = {
@@ -293,22 +316,7 @@ class CpauWaterCli(CpauApp):
                     row['billing_period_length'] = record.billing_period_length
                 rows.append(row)
 
-            if self.args.output_file:
-                try:
-                    with open(self.args.output_file, 'w', newline='') as f:
-                        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                        writer.writeheader()
-                        writer.writerows(rows)
-                    self.logger.info(f"Wrote {len(rows)} records to {self.args.output_file}")
-                except Exception as e:
-                    self.logger.error(f"Failed to write output file: {e}")
-                    return 1
-            else:
-                writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames, extrasaction='ignore')
-                writer.writeheader()
-                writer.writerows(rows)
-
-            return 0
+            return self.write_csv(rows, fieldnames)
 
         except CpauError as e:
             self.logger.error(f"CPAU API error: {e}")

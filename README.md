@@ -407,6 +407,10 @@ cpau/
 
 ## Changelog
 
+### 1.3.3
+- `cpau-electric` and `cpau-water` now treat the "defaulted end_date precedes start_date" case as an empty result (header-only CSV, exit 0) rather than an error. Previously, an incremental fetch loop that had caught up to CPAU's trailing edge — start_date one day past `max(date)`, end_date defaulted to "two days ago" (electric) or today (water) — would log an `Invalid date range` ERROR every run. The synthesized inverted range was the tool's fault, not the caller's, so it shouldn't surface as one. Explicit user-supplied inverted ranges still error as before.
+- Refactor: extracted shared CSV-writing logic into `CpauApp.write_csv()` so both CLIs share one path for output-file vs stdout handling.
+
 ### 1.3.2
 - Fix electric billing data availability/parsing. The CPAU LoadUsage endpoint now returns billing records with an empty `BillPeriod` field, populating separate `FromDate` / `ToDate` fields instead. The parser previously fell back to a Year/Month synthesis that produced the right grouping for billing usage but dropped every record from `cpau-availability` and emitted blank `billing_period_start` / `billing_period_end` columns. Both paths now fall back to `FromDate` / `ToDate` when `BillPeriod` is empty.
 
